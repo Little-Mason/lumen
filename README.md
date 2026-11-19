@@ -76,7 +76,7 @@ npm run dev                 # http://localhost:3000 ，/api/health 返回 200 �
 
 > 第一版是**架构骨架**：目录、契约、数据模型、CI/CD、文档已就位，页面与部分服务为占位实现，W2/W3 会替换。依赖未预装，按上面第 2 步执行即可。
 >
-> **当前状态**：v0.1 尚未在本地完成依赖安装、类型检查与完整构建（见 `docs/ROADMAP.md` W1），因此 CI 首次运行可能在 lint / typecheck / E2E 阶段报错，属预期。流水线当前用 `npm install`，不依赖 `package-lock.json`；本地装好依赖、提交 lockfile 并把 CI 切到 `npm ci` 后，再逐项收敛为全绿。
+> **当前状态**：依赖已锁定（`package-lock.json` + CI 用 `npm ci`）。本地已验证 `typecheck`、`lint` 与单元测试（4/4）全绿；生产构建与 E2E 以 GitHub Actions（`ubuntu-latest`）结果为准——本机 Windows 环境写 `.next/trace` 会报 `EPERM`，不影响 CI。页面与部分服务仍是骨架实现，按 `docs/ROADMAP.md` W1–W3 替换。
 
 ## 常用脚本
 

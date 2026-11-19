@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx prisma generate
       - run: npm run lint
       - run: npm run typecheck
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run build
 
   e2e:
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       # W1 用 db push 快速同步 schema；迁移文件落地后改为 prisma migrate deploy
       - run: npx prisma db push --skip-generate
       - run: psql "$DATABASE_URL" -f prisma/sql/001_pgvector.sql
