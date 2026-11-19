@@ -1,0 +1,41 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: lumen-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lumen
+      POSTGRES_PASSWORD: lumen
+      POSTGRES_DB: lumen
+    ports:
+      - '5432:5432'
+    volumes:
+      - lumen-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lumen -d lumen']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: lumen-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - lumen-redisdata:/data
+
+  # 可选：整站容器化，与 CI 产出的镜像保持一致
+  # app:
+  #   image: ghcr.io/<owner>/lumen:latest
+  #   env_file: .env
+  #   ports: ['3000:3000']
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+
+volumes:
+  lumen-pgdata:
+  lumen-redisdata:

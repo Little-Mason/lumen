@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgresql://lumen:lumen@localhost:5432/lumen?schema=public
+  AUTH_SECRET: ci-only-placeholder-secret-32-chars
+  AI_API_KEY: ''
+  EMBEDDING_API_KEY: ''
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  quality:
+    name: Lint / Typecheck / Schema / Unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run db:validate
+      - run: npm test
+
+  build:
+    name: Production build
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+
+  e2e:
+    name: E2E (Postgres + pgvector)
+    needs: build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: lumen
+          POSTGRES_PASSWORD: lumen
+          POSTGRES_DB: lumen
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lumen -d lumen"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      # W1 用 db push 快速同步 schema；迁移文件落地后改为 prisma migrate deploy
+      - run: npx prisma db push --skip-generate
+      - run: psql "$DATABASE_URL" -f prisma/sql/001_pgvector.sql
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+  image:
+    name: Docker image
+    needs: [quality, build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: lumen:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

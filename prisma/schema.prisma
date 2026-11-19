@@ -1,0 +1,128 @@
+// Lumen 数据模型 v0.1
+// 设计原则：内容统一建模（文章/小说/笔记共用一张表），AI 调用与向量切片独立可审计。
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum ContentType {
+  ARTICLE // 技术博客 / 自媒体稿
+  CHAPTER // 小说章节
+  NOTE // 雅思、学习、灵感碎片
+}
+
+enum ContentStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum Role {
+  OWNER
+  EDITOR
+}
+
+enum AiJobKind {
+  OUTLINE
+  TITLE
+  TAGS
+  SUMMARIZE
+  POLISH
+  RAG_ASK
+}
+
+enum AiJobStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String
+  role         Role      @default(OWNER)
+  contents     Content[]
+  aiJobs       AiJob[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Content {
+  id             String         @id @default(cuid())
+  authorId       String
+  author         User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  type           ContentType    @default(ARTICLE)
+  status         ContentStatus  @default(DRAFT)
+  title          String
+  slug           String         @unique
+  excerpt        String?
+  contentMd      String         @db.Text
+  coverUrl       String?
+  tags           Tag[]
+  publishedAt    DateTime?
+  viewCount      Int            @default(0)
+  wordCount      Int            @default(0)
+  readingMinutes Int            @default(0)
+  aiJobs         AiJob[]
+  chunks         ContentChunk[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([status, publishedAt])
+  @@index([type, status])
+  @@index([authorId, updatedAt])
+}
+
+model Tag {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  contents Content[]
+}
+
+// 每次 AI 调用都落库：token、成本、延迟、状态，用于后台看板与预算告警
+model AiJob {
+  id               String      @id @default(cuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId        String?
+  content          Content?    @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  kind             AiJobKind
+  status           AiJobStatus @default(PENDING)
+  model            String
+  promptTokens     Int         @default(0)
+  completionTokens Int         @default(0)
+  costCents        Int         @default(0)
+  latencyMs        Int         @default(0)
+  error            String?
+  createdAt        DateTime    @default(now())
+
+  @@index([userId, createdAt])
+  @@index([kind, status])
+}
+
+// RAG 切片。embedding 用 Prisma Unsupported 类型，写入与检索走 $queryRaw。
+// 维度由 EMBEDDING_DIM 决定；换 embedding 模型必须重建本列与索引。
+model ContentChunk {
+  id         String    @id @default(cuid())
+  contentId  String
+  content    Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  chunkIndex Int
+  text       String    @db.Text
+  embedding  Unsupported("vector(1536)")?
+  tokenCount Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  @@unique([contentId, chunkIndex])
+  @@index([contentId])
+}
