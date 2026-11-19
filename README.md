@@ -76,7 +76,7 @@ npm run dev                 # http://localhost:3000 ，/api/health 返回 200 �
 
 > 第一版是**架构骨架**：目录、契约、数据模型、CI/CD、文档已就位，页面与部分服务为占位实现，W2/W3 会替换。依赖未预装，按上面第 2 步执行即可。
 >
-> **当前状态**：`package-lock.json` 尚未提交，因此 CI 中的 `npm ci` 首次运行会失败；本地执行 `npm install` 并提交 lockfile 后即转绿。
+> **当前状态**：v0.1 尚未在本地完成依赖安装、类型检查与完整构建（见 `docs/ROADMAP.md` W1），因此 CI 首次运行可能在 lint / typecheck / E2E 阶段报错，属预期。流水线当前用 `npm install`，不依赖 `package-lock.json`；本地装好依赖、提交 lockfile 并把 CI 切到 `npm ci` 后，再逐项收敛为全绿。
 
 ## 常用脚本
 
