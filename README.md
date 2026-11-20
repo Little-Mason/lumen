@@ -10,28 +10,28 @@ Lumen（`光栈`）是一个 AI 原生的个人内容工作台。它同时服务
 
 ## 能做什么
 
-| 模块 | 内容 | 阶段 |
-|---|---|---|
-| 统一内容模型 | `ARTICLE / CHAPTER / NOTE` 三类共用一张表，草稿 → 审阅 → 发布 → 归档 | W1 |
-| 前台公开站 | 列表、详情、标签、Markdown 渲染、SEO/OG、sitemap、RSS | W2 |
-| 后台写作台 | 登录、Markdown 编辑、自动 slug、字数与阅读时长、发布日历 | W2 |
-| AI 辅助 | 大纲 / 标题 / 标签 / 摘要 / 润色，流式输出，prompt 防注入 | W3 |
-| 知识库问答 | 内容切片 → embedding → pgvector 检索 → 带引用回答（RAG） | W3 |
-| 用量看板 | 每次 AI 调用的 token、成本、延迟、失败率、预算告警 | W4 |
-| 工程基线 | CI 门禁、E2E、多阶段 Docker 镜像、自动迁移、健康检查、回滚 | W1 → W4 |
+| 模块         | 内容                                                                 | 阶段    |
+| ------------ | -------------------------------------------------------------------- | ------- |
+| 统一内容模型 | `ARTICLE / CHAPTER / NOTE` 三类共用一张表，草稿 → 审阅 → 发布 → 归档 | W1      |
+| 前台公开站   | 列表、详情、标签、Markdown 渲染、SEO/OG、sitemap、RSS                | W2      |
+| 后台写作台   | 登录、Markdown 编辑、自动 slug、字数与阅读时长、发布日历             | W2      |
+| AI 辅助      | 大纲 / 标题 / 标签 / 摘要 / 润色，流式输出，prompt 防注入            | W3      |
+| 知识库问答   | 内容切片 → embedding → pgvector 检索 → 带引用回答（RAG）             | W3      |
+| 用量看板     | 每次 AI 调用的 token、成本、延迟、失败率、预算告警                   | W4      |
+| 工程基线     | CI 门禁、E2E、多阶段 Docker 镜像、自动迁移、健康检查、回滚           | W1 → W4 |
 
 ## 技术栈
 
-| 层 | 选型 | 理由 |
-|---|---|---|
+| 层       | 选型                                          | 理由                                        |
+| -------- | --------------------------------------------- | ------------------------------------------- |
 | 全栈框架 | Next.js 15 App Router + React 19 + TypeScript | RSC 减少客户端 JS，一套代码覆盖前后台与 API |
-| 样式 | Tailwind CSS 3 | 快速且无需额外设计系统 |
-| ORM / DB | Prisma 6 + PostgreSQL 16 + pgvector | 关系数据与向量检索同库，省掉一套向量数据库 |
-| 认证 | jose (JWT) + bcryptjs + httpOnly Cookie | 无第三方依赖，可讲清会话与 CSRF 权衡 |
-| AI | Vercel AI SDK v4 + OpenAI 兼容协议 | 换 DeepSeek / OpenAI / 硅基流动只改 `.env` |
-| 校验 | Zod | 环境变量与所有入参统一校验 |
-| 测试 | Vitest（单元） + Playwright（E2E） | 快 + 真实浏览器 |
-| CI/CD | GitHub Actions + GHCR + standalone Docker | 免费、可展示、健康检查与回滚完整 |
+| 样式     | Tailwind CSS 3                                | 快速且无需额外设计系统                      |
+| ORM / DB | Prisma 6 + PostgreSQL 16 + pgvector           | 关系数据与向量检索同库，省掉一套向量数据库  |
+| 认证     | jose (JWT) + bcryptjs + httpOnly Cookie       | 无第三方依赖，可讲清会话与 CSRF 权衡        |
+| AI       | Vercel AI SDK v4 + OpenAI 兼容协议            | 换 DeepSeek / OpenAI / 硅基流动只改 `.env`  |
+| 校验     | Zod                                           | 环境变量与所有入参统一校验                  |
+| 测试     | Vitest（单元） + Playwright（E2E）            | 快 + 真实浏览器                             |
+| CI/CD    | GitHub Actions + GHCR + standalone Docker     | 免费、可展示、健康检查与回滚完整            |
 
 ## 目录结构
 
@@ -74,19 +74,23 @@ npm run db:seed
 npm run dev                 # http://localhost:3000 ，/api/health 返回 200 即通
 ```
 
+> **本机 Docker 起不来时**：可以完全绕开 Docker，用 Windows 原生 PostgreSQL 16 + pgvector 预编译包，同样满足 `DATABASE_URL`。这是当前开发机的实际配置（`D:\appRun\PostgreSQL\16`，服务 `postgresql-x64-16`），步骤与验收结果见 `docs/DASHBOARD-PLAN.md` 的「门禁 A · A4」。`docker-compose.yml` 仍保留给 CI/CD 与容器化部署使用，两条路径的数据库凭据一致。
+>
+> 2026-11-20 20:45 补充：Docker 引擎已通过 `docker-vmm` 模式修复并正常运行（不依赖 WSL2），但本机到 Docker Hub 的网络不通，拉不到镜像，所以本地 `docker compose up -d` 仍不可用；继续用上面的原生 PostgreSQL。详见 `docs/DASHBOARD-PLAN.md`。
+
 > 第一版是**架构骨架**：目录、契约、数据模型、CI/CD、文档已就位，页面与部分服务为占位实现，W2/W3 会替换。依赖未预装，按上面第 2 步执行即可。
 >
 > **当前状态**：依赖已锁定（`package-lock.json` + CI 用 `npm ci`）。本地已验证 `typecheck`、`lint` 与单元测试（4/4）全绿；生产构建与 E2E 以 GitHub Actions（`ubuntu-latest`）结果为准——本机 Windows 环境写 `.next/trace` 会报 `EPERM`，不影响 CI。页面与部分服务仍是骨架实现，按 `docs/ROADMAP.md` W1–W3 替换。
 
 ## 常用脚本
 
-| 命令 | 作用 |
-|---|---|
-| `npm run dev` / `build` / `start` | 开发 / 生产构建 / 启动 |
-| `npm run lint` / `typecheck` | ESLint / `tsc --noEmit` |
-| `npm test` / `test:e2e` | 单元 / 端到端 |
+| 命令                                               | 作用                            |
+| -------------------------------------------------- | ------------------------------- |
+| `npm run dev` / `build` / `start`                  | 开发 / 生产构建 / 启动          |
+| `npm run lint` / `typecheck`                       | ESLint / `tsc --noEmit`         |
+| `npm test` / `test:e2e`                            | 单元 / 端到端                   |
 | `npm run db:validate` / `db:migrate` / `db:studio` | 校验 schema / 生成迁移 / 可视化 |
-| `npm run docker:up` | 起本地 Postgres + Redis |
+| `npm run docker:up`                                | 起本地 Postgres + Redis         |
 
 ## 环境变量
 
@@ -94,12 +98,12 @@ npm run dev                 # http://localhost:3000 ，/api/health 返回 200 �
 
 ## 四周路线与验收
 
-| 周 | 交付 | 验收（DoD） |
-|---|---|---|
-| W1 11/19–11/25 | 仓库、架构、CI、schema、认证、登录注册 | push 触发 CI 全绿；`/api/health` 返回 200 |
-| W2 11/26–12/02 | 内容 CRUD、写作台、公开站、SEO、单测 | 从后台发一篇文章，前台可见且被搜索引擎可索引 |
-| W3 12/03–12/09 | 五种 AI 能力、流式、RAG、E2E | 能对已发布内容提问并给出带出处的回答 |
-| W4 12/10–12/19 | 看板、上线、2 篇技术文、简历与面试话术 | 在线链接 + 演示视频 + 完整 README |
+| 周             | 交付                                   | 验收（DoD）                                  |
+| -------------- | -------------------------------------- | -------------------------------------------- |
+| W1 11/19–11/25 | 仓库、架构、CI、schema、认证、登录注册 | push 触发 CI 全绿；`/api/health` 返回 200    |
+| W2 11/26–12/02 | 内容 CRUD、写作台、公开站、SEO、单测   | 从后台发一篇文章，前台可见且被搜索引擎可索引 |
+| W3 12/03–12/09 | 五种 AI 能力、流式、RAG、E2E           | 能对已发布内容提问并给出带出处的回答         |
+| W4 12/10–12/19 | 看板、上线、2 篇技术文、简历与面试话术 | 在线链接 + 演示视频 + 完整 README            |
 
 详见 `docs/ROADMAP.md`。
 

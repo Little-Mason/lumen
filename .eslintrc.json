@@ -4,5 +4,5 @@
     "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "no-console": ["warn", { "allow": ["warn", "error"] }]
   },
-  "ignorePatterns": [".next/", "node_modules/", "coverage/", "playwright-report/"]
+  "ignorePatterns": [".next/", "node_modules/", "coverage/", "playwright-report/", "next-env.d.ts"]
 }
