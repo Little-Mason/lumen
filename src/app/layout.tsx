@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { AuthNav } from '@/components/auth-nav';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -16,10 +17,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-paper text-ink antialiased">
         <header className="border-b border-black/10">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-            <Link href="/" className="text-lg font-semibold tracking-tight">Lumen</Link>
-            <nav className="flex gap-5 text-sm text-black/60">
+            <Link href="/" className="text-lg font-semibold tracking-tight">
+              Lumen
+            </Link>
+            <nav className="flex items-center gap-5 text-sm text-black/60">
               <Link href="/posts/building-lumen">文章</Link>
               <Link href="/dashboard">工作台</Link>
+              <AuthNav />
             </nav>
           </div>
         </header>

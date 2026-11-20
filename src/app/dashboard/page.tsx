@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { DbStatus } from '@/components/db-status';
+import { readSession } from '@/lib/auth/session';
 
 export const metadata = { title: '工作台' };
 
@@ -30,13 +31,20 @@ const cards = [
   },
 ] as const;
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  // middleware 是第一道闸；这里再读一次会话，把「谁在登录」显示在页面上。
+  const session = await readSession();
   return (
     <div>
       <h1 className="mb-2 text-3xl font-semibold tracking-tight">工作台</h1>
-      <p className="mb-6 text-sm text-black/55">
+      <p className="mb-2 text-sm text-black/55">
         四个模块按 W2 → W3 → W4 顺序落地。卡片已可点击进入各自的页面。
       </p>
+      {session && (
+        <p className="mb-4 text-xs text-black/45">
+          当前登录：{session.email} · 角色 {session.role}
+        </p>
+      )}
       <DbStatus />
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {cards.map((c) => (

@@ -274,3 +274,23 @@ npm run db:seed                                # 种子数据
 npm run test:e2e                               # 需 DB 起好
 git add -A && git commit -m "..." && git push  # 触发 CI
 ```
+
+## 10. 门禁 B · 认证闭环（2026-11-21 完成）
+
+Docker 侧的前置问题也一并结束：用户启用 `HypervisorPlatform`、重启、把 VMM 内存设为 `MemoryMiB=5104` 后，CBS 的 `pending.xml` 消失、`vmcompute.exe` / `WinHvPlatform.dll` / `vmswitch.sys` 落地。实测 `docker pull hello-world:latest`（经 daocloud registry-mirror）、`docker run --rm hello-world`、后台 `alpine sleep 20` + `docker exec` 全部通过。本机 5432 仍由原生 PostgreSQL 占用，**不要 `docker compose up -d`**。
+
+门禁 B 的实现边界：
+
+| 层                  | 文件                                                                       | 职责                                                            |
+| ------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 纯 JWT（Edge 安全） | `src/lib/auth/token.ts`                                                    | 签名 / 验签，显式传 secret，不引 `next/headers`、Prisma、bcrypt |
+| 入参校验            | `src/lib/auth/validation.ts`                                               | Zod：邮箱归一化、密码 8–72 位、邀请码                           |
+| Cookie              | `src/lib/auth/session.ts`                                                  | 读写 `httpOnly` Cookie，7 天有效                                |
+| 业务编排            | `src/server/services/auth.service.ts`                                      | 注册 / 校验凭据 / 按 id 取用户                                  |
+| HTTP                | `src/app/api/auth/{register,login,logout,me}/route.ts` + `src/lib/http.ts` | 统一 `ApiError` 结构与状态码映射                                |
+| 路由闸              | `src/middleware.ts`                                                        | `/dashboard*` 未登录跳转 `/login?next=...`                      |
+| UI                  | `src/app/login/page.tsx`、`src/components/auth-form.tsx`、`auth-nav.tsx`   | 登录 / 注册表单、导航里的会话状态与退出                         |
+
+安全取舍：首个账号自动 OWNER，之后需 `AUTH_INVITE_CODE`；登录失败统一 401 且用固定 bcrypt 哈希抵消时间差；`next` 在服务端校验，拒绝 `//` 开头的开放重定向；`/api/auth/me` 以数据库为准，删号后旧 JWT 立即失效。
+
+CI 同步改动：`env.AUTH_INVITE_CODE=lumen-dev-invite`（与本机 `.env` 一致）；e2e job 在 `prisma db push` + pgvector DDL 之后增加 `npm run db:seed`；`tests/e2e/smoke.spec.ts` 改为覆盖「未登录拦截 → 种子账号登录 → 邀请码注册 → 退出后再次被拦截」。下一步是 **Step 2 内容模块**（`/api/contents` CRUD + 写作台）。

@@ -1,41 +1,23 @@
-import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { env } from '@/lib/env';
+import {
+  signSessionToken,
+  verifySessionToken,
+  SESSION_TTL_SECONDS,
+  type SessionPayload,
+} from '@/lib/auth/token';
 
-export type SessionPayload = {
-  sub: string;
-  email: string;
-  role: 'OWNER' | 'EDITOR';
-};
+export type { SessionPayload } from '@/lib/auth/token';
 
-const key = new TextEncoder().encode(env.AUTH_SECRET);
-const TTL = '7d';
-
-export async function createSessionToken(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ email: payload.email, role: payload.role })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(payload.sub)
-    .setIssuedAt()
-    .setExpirationTime(TTL)
-    .sign(key);
+export function createSessionToken(payload: SessionPayload): Promise<string> {
+  return signSessionToken(payload, env.AUTH_SECRET);
 }
 
 export async function readSession(): Promise<SessionPayload | null> {
   const store = await cookies();
   const token = store.get(env.AUTH_COOKIE_NAME)?.value;
   if (!token) return null;
-
-  try {
-    const { payload } = await jwtVerify(token, key);
-    if (!payload.sub || typeof payload.email !== 'string') return null;
-    return {
-      sub: payload.sub,
-      email: payload.email,
-      role: payload.role === 'EDITOR' ? 'EDITOR' : 'OWNER',
-    };
-  } catch {
-    return null;
-  }
+  return verifySessionToken(token, env.AUTH_SECRET);
 }
 
 export const sessionCookieOptions = {
@@ -43,5 +25,16 @@ export const sessionCookieOptions = {
   sameSite: 'lax' as const,
   secure: process.env.NODE_ENV === 'production',
   path: '/',
-  maxAge: 60 * 60 * 24 * 7,
+  maxAge: SESSION_TTL_SECONDS,
 };
+
+export async function setSessionCookie(payload: SessionPayload): Promise<void> {
+  const token = await createSessionToken(payload);
+  const store = await cookies();
+  store.set(env.AUTH_COOKIE_NAME, token, sessionCookieOptions);
+}
+
+export async function clearSessionCookie(): Promise<void> {
+  const store = await cookies();
+  store.delete(env.AUTH_COOKIE_NAME);
+}

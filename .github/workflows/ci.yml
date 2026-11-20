@@ -13,6 +13,8 @@ concurrency:
 env:
   DATABASE_URL: postgresql://lumen:lumen@localhost:5432/lumen?schema=public
   AUTH_SECRET: ci-only-placeholder-secret-32-chars
+  # E2E 注册用例用；与本机 .env / tests/e2e/smoke.spec.ts 保持一致。
+  AUTH_INVITE_CODE: lumen-dev-invite
   AI_API_KEY: ''
   EMBEDDING_API_KEY: ''
   NEXT_PUBLIC_SITE_URL: http://localhost:3000
@@ -71,6 +73,8 @@ jobs:
       # W1 用 db push 快速同步 schema；迁移文件落地后改为 prisma migrate deploy
       - run: npx prisma db push --skip-generate
       - run: psql "$DATABASE_URL" -f prisma/sql/001_pgvector.sql
+      # 认证闭环 E2E 需要一个可登录的 OWNER 账号
+      - run: npm run db:seed
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
 

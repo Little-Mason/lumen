@@ -80,7 +80,36 @@ npm run dev                 # http://localhost:3000 ，/api/health 返回 200 �
 
 > 第一版是**架构骨架**：目录、契约、数据模型、CI/CD、文档已就位，页面与部分服务为占位实现，W2/W3 会替换。依赖未预装，按上面第 2 步执行即可。
 >
-> **当前状态**：依赖已锁定（`package-lock.json` + CI 用 `npm ci`）。本地已验证 `typecheck`、`lint` 与单元测试（4/4）全绿；生产构建与 E2E 以 GitHub Actions（`ubuntu-latest`）结果为准——本机 Windows 环境写 `.next/trace` 会报 `EPERM`，不影响 CI。页面与部分服务仍是骨架实现，按 `docs/ROADMAP.md` W1–W3 替换。
+> **当前状态**：依赖已锁定（`package-lock.json` + CI 用 `npm ci`）。本地已验证 `typecheck`、`lint` 与单元测试全绿；生产构建与 E2E 以 GitHub Actions（`ubuntu-latest`）结果为准——本机 Windows 环境写 `.next/trace` 会报 `EPERM`，不影响 CI。页面与部分服务仍是骨架实现，按 `docs/ROADMAP.md` W1–W3 替换。
+
+## 门禁 B · 认证闭环（已通过）
+
+`/dashboard/*` 现已受保护，`/login` 提供登录与注册（带邀请码）。种子账号由 `npm run db:seed` 创建：
+
+```text
+邮箱 owner@lumen.local    密码 change-me-123    角色 OWNER
+```
+
+命令行验收（把 Cookie 存到文件，模拟真实浏览器）：
+
+```bash
+# 未登录访问工作台 → 307 跳登录页
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:3000/dashboard
+
+# 登录 → 200 且写 httpOnly Cookie
+curl -s -c /tmp/lumen.cookies -X POST http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"owner@lumen.local","password":"change-me-123"}'
+
+# 带会话读 me / 访问工作台
+curl -s -b /tmp/lumen.cookies http://localhost:3000/api/auth/me
+curl -s -o /dev/null -w '%{http_code}\n' -b /tmp/lumen.cookies http://localhost:3000/dashboard
+
+# 退出 → 再访问工作台重新被拦截
+curl -s -b /tmp/lumen.cookies -c /tmp/lumen.cookies -X POST http://localhost:3000/api/auth/logout
+```
+
+`AUTH_INVITE_CODE` 为空时只允许一个账号；本机 `.env` 与 CI 均设为 `lumen-dev-invite`（见 `.github/workflows/ci.yml`）。E2E 覆盖「未登录拦截 → 种子账号登录 → 邀请码注册 → 退出后再次被拦截」。
 
 ## 常用脚本
 
