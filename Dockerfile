@@ -4,7 +4,7 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 COPY prisma ./prisma
 RUN npx prisma generate
 
@@ -12,11 +12,12 @@ FROM base AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# 构建期只需要能通过 env 校验，真实密钥在运行时注入
-ARG DATABASE_URL="postgresql://lumen:lumen@db:5432/lumen?schema=public"
-ARG AUTH_SECRET="build-time-placeholder-not-used-in-runtime"
-ARG NEXT_PUBLIC_SITE_URL="http://localhost:3000"
-RUN npm run build
+# 构建期只需要能通过 env 校验，真实密钥在运行时注入。
+# 用 RUN 内联环境变量而非 ARG，避免占位密钥进入镜像 history / BuildKit secret 警告。
+RUN DATABASE_URL="postgresql://lumen:lumen@db:5432/lumen?schema=public" \
+    AUTH_SECRET="build-time-placeholder-not-used-in-runtime" \
+    NEXT_PUBLIC_SITE_URL="http://localhost:3000" \
+    npm run build
 
 FROM base AS runner
 ENV NODE_ENV=production

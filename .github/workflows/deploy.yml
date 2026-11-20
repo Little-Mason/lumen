@@ -56,7 +56,7 @@ jobs:
           node-version: 22
       - run: npm ci --no-audit --no-fund
       - run: npx prisma db push --skip-generate
-      - run: psql "$DATABASE_URL" -f prisma/sql/001_pgvector.sql
+      - run: npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
 
       # 平台部署二选一（在仓库 Secrets 里配好其一即可）：
       # Vercel: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}

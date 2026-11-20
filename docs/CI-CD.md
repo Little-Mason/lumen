@@ -6,12 +6,12 @@
 
 ## 2. CI（`.github/workflows/ci.yml`）
 
-| Job | 触发 | 内容 |
-|---|---|---|
-| `quality` | 所有 push / PR | `npm install` → `prisma generate` → lint → typecheck → `prisma validate` → Vitest |
-| `build` | quality 通过 | `npm run build`（注入占位 env，验证构建期不依赖真实密钥） |
-| `e2e` | build 通过 | 起 `pgvector/pgvector:pg16` service → `db push` → 建向量索引 → Playwright Chromium |
-| `image` | 仅 main | 多阶段 Docker 构建，不推送，用 GHA 缓存加速 |
+| Job       | 触发           | 内容                                                                                                   |
+| --------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `quality` | 所有 push / PR | `npm ci` → `prisma generate` → lint → typecheck → `prisma validate` → Vitest                           |
+| `build`   | quality 通过   | `npm run build`（注入占位 env，验证构建期不依赖真实密钥）                                              |
+| `e2e`     | build 通过     | 起 `pgvector/pgvector:pg16` service → `db push` → `prisma db execute` 建向量索引 → Playwright Chromium |
+| `image`   | 仅 main        | 多阶段 Docker 构建，不推送，用 GHA 缓存加速                                                            |
 
 设计要点：构建期只用占位 env，真实密钥只在运行时注入，避免密钥进入镜像层；`concurrency` 取消同一分支的旧任务，省 CI 时间。
 
@@ -27,13 +27,13 @@
 
 ## 4. Secrets 清单
 
-| Secret | 用途 |
-|---|---|
-| `DATABASE_URL` | 生产 Postgres（含 pgvector） |
-| `AUTH_SECRET` | JWT 签名，≥32 字节随机 |
-| `AI_API_KEY` / `EMBEDDING_API_KEY` | 模型调用 |
-| `VERCEL_TOKEN` 或 `RAILWAY_TOKEN` | 平台部署 |
-| `GITHUB_TOKEN` | GHCR 推送（workflow 自带） |
+| Secret                             | 用途                         |
+| ---------------------------------- | ---------------------------- |
+| `DATABASE_URL`                     | 生产 Postgres（含 pgvector） |
+| `AUTH_SECRET`                      | JWT 签名，≥32 字节随机       |
+| `AI_API_KEY` / `EMBEDDING_API_KEY` | 模型调用                     |
+| `VERCEL_TOKEN` 或 `RAILWAY_TOKEN`  | 平台部署                     |
+| `GITHUB_TOKEN`                     | GHCR 推送（workflow 自带）   |
 
 `vars.APP_URL` 为生产域名，供健康检查使用。**任何密钥都不写进 `.env` 提交、不打进日志、不进 `NEXT_PUBLIC_*`。**
 

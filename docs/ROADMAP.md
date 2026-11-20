@@ -8,7 +8,7 @@
 - [x] `.env` 校验、Prisma schema、pgvector SQL、种子数据
 - [x] CI 流水线（lint / typecheck / schema / unit / build / E2E / 镜像）
 - [x] 架构文档、接口契约、部署与面试文档
-- [ ] 认证闭环：注册 / 登录 / 登出 / 会话校验中间件
+- [x] 认证闭环：注册 / 登录 / 登出 / 会话校验中间件（Gate B，commit `176485d`）
 - [ ] `/api/health` 在容器与健康检查中返回 200
 
 **验收**：push 到 main 后 CI 全绿；本地 `npm run dev` 能打开首页与工作台；`db push` 无报错。

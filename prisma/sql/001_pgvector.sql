@@ -1,4 +1,5 @@
--- 首次迁移后执行：psql "$DATABASE_URL" -f prisma/sql/001_pgvector.sql
+-- 首次迁移后执行：npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
+-- 不要用 psql "$DATABASE_URL"：连接串里的 ?schema=public 是 Prisma 专用参数，psql 会报 invalid URI query parameter。
 -- Prisma 的 Unsupported("vector(1536)") 只会建出列，索引与扩展需手工补。
 
 CREATE EXTENSION IF NOT EXISTS vector;

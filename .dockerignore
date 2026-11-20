@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+.env
+.env.*
+!.env.example
+*.log
+coverage
+playwright-report
+test-results
+.vitest-tmp
+_lumen-stale
+docs
+tests
+README.md
+ARCHITECTURE.md

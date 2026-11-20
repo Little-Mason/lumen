@@ -7,7 +7,7 @@ docker compose up -d          # Postgres(pgvector) :5432 + Redis :6379
 cp .env.example .env
 npm install
 npx prisma db push
-psql "$DATABASE_URL" -f prisma/sql/001_pgvector.sql
+npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
 npm run db:seed
 npm run dev
 ```
@@ -16,11 +16,11 @@ npm run dev
 
 ## 2. 三种生产形态
 
-| 方案 | 组合 | 适合 | 注意 |
-|---|---|---|---|
-| A（推荐起步） | Vercel + Neon/Supabase Postgres | 零运维、PR 预览、自动 HTTPS | 需确认供应商支持 `vector` 扩展；Serverless 下 Prisma 要用连接池（PgBouncer / `?pgbouncer=true`） |
-| B | Railway / Render + 同平台 Postgres + GHCR 镜像 | 与本地 Docker 完全一致，链路最好讲 | 容器常驻，注意 `output: 'standalone'` 与迁移时机 |
-| C | 单台 VPS + `docker compose` | 最便宜、完全可控 | 自己管备份、证书、监控 |
+| 方案          | 组合                                           | 适合                               | 注意                                                                                             |
+| ------------- | ---------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------ |
+| A（推荐起步） | Vercel + Neon/Supabase Postgres                | 零运维、PR 预览、自动 HTTPS        | 需确认供应商支持 `vector` 扩展；Serverless 下 Prisma 要用连接池（PgBouncer / `?pgbouncer=true`） |
+| B             | Railway / Render + 同平台 Postgres + GHCR 镜像 | 与本地 Docker 完全一致，链路最好讲 | 容器常驻，注意 `output: 'standalone'` 与迁移时机                                                 |
+| C             | 单台 VPS + `docker compose`                    | 最便宜、完全可控                   | 自己管备份、证书、监控                                                                           |
 
 **域名与 HTTPS**：平台托管证书即可；`NEXT_PUBLIC_SITE_URL` 设为正式域名，影响 OG、sitemap、RSS 的绝对地址。
 
@@ -49,9 +49,9 @@ npm run dev
 
 ## 6. 常见问题
 
-| 现象 | 排查 |
-|---|---|
+| 现象                               | 排查                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------- |
 | `prisma db push` 报 extension 权限 | 确认镜像是 `pgvector/pgvector:pg16`，或手动 `CREATE EXTENSION vector` |
-| Serverless 下连接数打满 | 加连接池参数，复用全局 `PrismaClient`（`src/lib/db.ts` 已处理 HMR） |
-| AI 返回 401 | 检查 `AI_BASE_URL` 是否带 `/v1`，DeepSeek 与 OpenAI 路径不同 |
-| 向量检索很慢 | 确认 HNSW 索引已建、`WHERE embedding IS NOT NULL` 与索引条件一致 |
+| Serverless 下连接数打满            | 加连接池参数，复用全局 `PrismaClient`（`src/lib/db.ts` 已处理 HMR）   |
+| AI 返回 401                        | 检查 `AI_BASE_URL` 是否带 `/v1`，DeepSeek 与 OpenAI 路径不同          |
+| 向量检索很慢                       | 确认 HNSW 索引已建、`WHERE embedding IS NOT NULL` 与索引条件一致      |

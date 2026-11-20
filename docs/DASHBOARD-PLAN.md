@@ -57,7 +57,7 @@ done
   ```bash
   docker compose up -d
   npx prisma db push
-  psql "$DATABASE_URL" -f prisma/sql/001_pgvector.sql
+  npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
   npm run db:seed
   curl -s http://127.0.0.1:3000/api/health
   ```
@@ -227,7 +227,7 @@ export default function Page() {
 
 1. **先修流水线**（见第 7 节），否则下面的步骤不会真正生效。
 2. **建生产库**：Neon / Supabase Postgres，确认可执行 `CREATE EXTENSION vector`；记录连接串，必要时加 `?pgbouncer=true`。
-3. **执行向量 DDL**：平台 SQL 编辑器跑 `prisma/sql/001_pgvector.sql`（GitHub runner 自带 `psql`，本机没有）。
+3. **执行向量 DDL**：平台 SQL 编辑器跑 `prisma/sql/001_pgvector.sql`，或用 `npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma`（不依赖本机 `psql`）。
 4. **生成密钥**：`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`。
 5. **GitHub → Settings → Secrets and variables → Actions**：
    - Secrets：`DATABASE_URL`、`AUTH_SECRET`、`AI_API_KEY`、`EMBEDDING_API_KEY`、`VERCEL_TOKEN` 或 `RAILWAY_TOKEN`（`GITHUB_TOKEN` 自动提供）。

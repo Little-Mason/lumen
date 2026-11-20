@@ -67,7 +67,7 @@ cp .env.example .env        # 填入 AUTH_SECRET、AI_API_KEY、EMBEDDING_API_KE
 
 # 3. 建表 + 向量索引 + 种子数据
 npx prisma db push
-psql "$DATABASE_URL" -f prisma/sql/001_pgvector.sql
+npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
 npm run db:seed
 
 # 4. 跑起来
