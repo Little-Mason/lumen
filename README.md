@@ -4,7 +4,7 @@
 
 > 一处写作，三处生长：技术博客、小说连载、学习笔记进同一个系统，前台做自媒体，后台做 AI 写作台，底层把全部内容变成可提问的个人知识库。
 
-**仓库**：[github.com/Little-Mason/lumen](https://github.com/Little-Mason/lumen) · 分支 `main` · 当前为 v0.1 架构骨架
+**仓库**：[github.com/Little-Mason/lumen](https://github.com/Little-Mason/lumen) · 分支 `main` · 当前为 v0.2（W1 地基 + W2 内容闭环已实现）
 
 Lumen（`光栈`）是一个 AI 原生的个人内容工作台。它同时服务两个目的：**真实可用的自媒体发布站**，以及**能讲清楚全栈 + AI + CI/CD 的面试作品**。内容来源不是造的假数据——技术文章来自项目本身，小说章节来自每日连载，笔记来自备考与复盘，天然有真实流量和真实数据。
 
@@ -40,7 +40,8 @@ lumen/
 ├── .github/workflows/     ci.yml（门禁） / deploy.yml（发布）
 ├── prisma/
 │   ├── schema.prisma      数据模型（含 aiJob 审计表、vector 切片表）
-│   ├── sql/001_pgvector.sql  扩展与 HNSW 索引
+│   ├── migrations/        首份迁移 20261121000000_init
+│   ├── sql/               000_extensions.sql（扩展）/ 001_pgvector.sql（HNSW 索引）
 │   └── seed.ts            种子数据
 ├── src/
 │   ├── app/               页面与 Route Handlers（含 /api/health）
@@ -65,8 +66,9 @@ docker compose up -d
 npm install
 cp .env.example .env        # 填入 AUTH_SECRET、AI_API_KEY、EMBEDDING_API_KEY
 
-# 3. 建表 + 向量索引 + 种子数据
-npx prisma db push
+# 3. 扩展 → 迁移 → 向量索引 → 种子数据（顺序不能反）
+npx prisma db execute --file prisma/sql/000_extensions.sql --schema prisma/schema.prisma
+npx prisma migrate deploy
 npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
 npm run db:seed
 
@@ -78,9 +80,9 @@ npm run dev                 # http://localhost:3000 ，/api/health 返回 200 �
 >
 > 2026-11-20 20:45 补充：Docker 引擎已通过 `docker-vmm` 模式修复并正常运行（不依赖 WSL2），但本机到 Docker Hub 的网络不通，拉不到镜像，所以本地 `docker compose up -d` 仍不可用；继续用上面的原生 PostgreSQL。详见 `docs/DASHBOARD-PLAN.md`。
 
-> 第一版是**架构骨架**：目录、契约、数据模型、CI/CD、文档已就位，页面与部分服务为占位实现，W2/W3 会替换。依赖未预装，按上面第 2 步执行即可。
->
-> **当前状态**：依赖已锁定（`package-lock.json` + CI 用 `npm ci`）。本地已验证 `typecheck`、`lint` 与单元测试全绿；生产构建与 E2E 以 GitHub Actions（`ubuntu-latest`）结果为准——本机 Windows 环境写 `.next/trace` 会报 `EPERM`，不影响 CI。页面与部分服务仍是骨架实现，按 `docs/ROADMAP.md` W1–W3 替换。
+> 2026-11-21 补充：`CREATE EXTENSION vector` 需要管理员权限，托管 Postgres 请先在平台 SQL 编辑器执行一次；扩展已存在时 `000_extensions.sql` 只是安全的 no-op。CI 的 `pgvector/pgvector:pg16` 里 `POSTGRES_USER=lumen` 本身就是超级用户，可以直接执行。
+
+> **当前状态**：依赖已锁定（`package-lock.json` + CI 用 `npm ci`）。W1 地基、门禁 B 认证闭环、W2 内容闭环均已落地；本地 `lint`、`typecheck`、单元测试（38/38）全绿，生产构建与 E2E 以 GitHub Actions（`ubuntu-latest`）结果为准——本机 Windows 环境写 `.next/trace` 会报 `EPERM`，不影响 CI。W3 的 AI/RAG 仍是契约先行。
 
 ## 门禁 B · 认证闭环（已通过）
 
@@ -111,15 +113,30 @@ curl -s -b /tmp/lumen.cookies -c /tmp/lumen.cookies -X POST http://localhost:300
 
 `AUTH_INVITE_CODE` 为空时只允许一个账号；本机 `.env` 与 CI 均设为 `lumen-dev-invite`（见 `.github/workflows/ci.yml`）。E2E 覆盖「未登录拦截 → 种子账号登录 → 邀请码注册 → 退出后再次被拦截」。
 
+## W2 · 内容闭环（已通过）
+
+登录后进 `/dashboard/content`：列表支持状态、类型、标签与关键词筛选；`/dashboard/content/new` 是带实时预览的 Markdown 写作台，可保存草稿、发布、下线、归档。
+
+| 页面 / 接口                                    | 说明                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| `/posts`、`/posts/[slug]`、`/tags/[slug]`      | 公开列表、详情、标签页；详情带 title / description / OG / canonical |
+| `/sitemap.xml`、`/rss.xml`、`/robots.txt`      | 由 Route Handler 与静态文件生成，读真实已发布内容                   |
+| `GET /api/contents`、`GET /api/tags`           | 公开只读，仅返回 `PUBLISHED`                                        |
+| `POST /api/contents`                           | 登录用户建草稿：自动 slug、摘要、字数、阅读时长、标签               |
+| `GET/PATCH/DELETE /api/contents/:id`           | 作者本人读写全文；DELETE 为软归档，不物理删除                       |
+| `POST /api/contents/:id/publish`、`/unpublish` | 发布写 `publishedAt`；下线回草稿                                    |
+
+中文标题会生成含中文的 slug，动态路由参数用 `normalizeSlugParam()` 解码后再查库。状态流转走 `canTransition()` 白名单，归档内容必须先回到草稿。首份迁移在 `prisma/migrations/20261121000000_init`，CI/CD 已从 `db push` 切到 `migrate deploy`。
+
 ## 常用脚本
 
-| 命令                                               | 作用                            |
-| -------------------------------------------------- | ------------------------------- |
-| `npm run dev` / `build` / `start`                  | 开发 / 生产构建 / 启动          |
-| `npm run lint` / `typecheck`                       | ESLint / `tsc --noEmit`         |
-| `npm test` / `test:e2e`                            | 单元 / 端到端                   |
-| `npm run db:validate` / `db:migrate` / `db:studio` | 校验 schema / 生成迁移 / 可视化 |
-| `npm run docker:up`                                | 起本地 Postgres + Redis         |
+| 命令                                                             | 作用                                |
+| ---------------------------------------------------------------- | ----------------------------------- |
+| `npm run dev` / `build` / `start`                                | 开发 / 生产构建 / 启动              |
+| `npm run lint` / `typecheck`                                     | ESLint / `tsc --noEmit`             |
+| `npm test` / `test:e2e`                                          | 单元 / 端到端                       |
+| `npm run db:validate` / `db:migrate` / `db:deploy` / `db:studio` | 校验 / 生成迁移 / 应用迁移 / 可视化 |
+| `npm run docker:up`                                              | 起本地 Postgres + Redis             |
 
 ## 环境变量
 

@@ -1,10 +1,4 @@
-export type AiJobKind =
-  | 'OUTLINE'
-  | 'TITLE'
-  | 'TAGS'
-  | 'SUMMARIZE'
-  | 'POLISH'
-  | 'RAG_ASK';
+export type AiJobKind = 'OUTLINE' | 'TITLE' | 'TAGS' | 'SUMMARIZE' | 'POLISH' | 'RAG_ASK';
 
 export type ContentType = 'ARTICLE' | 'CHAPTER' | 'NOTE';
 export type ContentStatus = 'DRAFT' | 'REVIEW' | 'PUBLISHED' | 'ARCHIVED';
@@ -21,6 +15,23 @@ export type ContentDTO = {
   publishedAt: string | null;
   updatedAt: string;
 };
+
+/** 列表项额外带标签与作者，供后台与公开列表直接渲染。 */
+export type ContentListItemDTO = ContentDTO & {
+  tags: string[];
+  authorName: string | null;
+  viewCount: number;
+};
+
+/** 编辑器加载用的完整内容，含 Markdown 全文。 */
+export type ContentDetailDTO = ContentListItemDTO & {
+  contentMd: string;
+  coverUrl: string | null;
+  authorId: string;
+  createdAt: string;
+};
+
+export type TagDTO = { name: string; slug: string; count: number };
 
 export type Paginated<T> = {
   items: T[];

@@ -6,12 +6,12 @@
 
 ## 2. CI（`.github/workflows/ci.yml`）
 
-| Job       | 触发           | 内容                                                                                                   |
-| --------- | -------------- | ------------------------------------------------------------------------------------------------------ |
-| `quality` | 所有 push / PR | `npm ci` → `prisma generate` → lint → typecheck → `prisma validate` → Vitest                           |
-| `build`   | quality 通过   | `npm run build`（注入占位 env，验证构建期不依赖真实密钥）                                              |
-| `e2e`     | build 通过     | 起 `pgvector/pgvector:pg16` service → `db push` → `prisma db execute` 建向量索引 → Playwright Chromium |
-| `image`   | 仅 main        | 多阶段 Docker 构建，不推送，用 GHA 缓存加速                                                            |
+| Job       | 触发           | 内容                                                                                                                     |
+| --------- | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `quality` | 所有 push / PR | `npm ci` → `prisma generate` → lint → typecheck → `prisma validate` → Vitest                                             |
+| `build`   | quality 通过   | `npm run build`（注入占位 env，验证构建期不依赖真实密钥）                                                                |
+| `e2e`     | build 通过     | 起 `pgvector/pgvector:pg16` service → `000_extensions.sql` → `migrate deploy` → `001_pgvector.sql` → Playwright Chromium |
+| `image`   | 仅 main        | 多阶段 Docker 构建，不推送，用 GHA 缓存加速                                                                              |
 
 设计要点：构建期只用占位 env，真实密钥只在运行时注入，避免密钥进入镜像层；`concurrency` 取消同一分支的旧任务，省 CI 时间。
 
@@ -20,7 +20,7 @@
 由 `workflow_run` 在 **main 的 CI 成功** 后触发，或手动 `workflow_dispatch`：
 
 1. 构建并推送镜像到 GHCR，打两个 tag：`:sha-<commit>` 与 `:latest`（可回溯、可回滚）。
-2. **先改库**：`prisma db push` + pgvector 索引（W2 起改 `migrate deploy`）。迁移必须向前兼容，先加列后改代码。
+2. **先改库**：`000_extensions.sql`（需管理员权限）→ `prisma migrate deploy` → `001_pgvector.sql`（HNSW 索引）。迁移必须向前兼容，先加列后改代码。
 3. 平台部署（Vercel 或 Railway，配置在 Secrets 里）。
 4. **健康检查**：轮询 `/api/health`，20 次 × 10s 内返回 200 才算发布成功；失败即退出非零并提示回滚到上一 `:sha-` tag。
 5. `environment: production` 可加人工审批与环境变量隔离。

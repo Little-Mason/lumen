@@ -55,7 +55,8 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --no-audit --no-fund
-      - run: npx prisma db push --skip-generate
+      - run: npx prisma db execute --file prisma/sql/000_extensions.sql --schema prisma/schema.prisma
+      - run: npx prisma migrate deploy
       - run: npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
 
       # 平台部署二选一（在仓库 Secrets 里配好其一即可）：

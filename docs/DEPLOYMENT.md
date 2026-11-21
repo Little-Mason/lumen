@@ -6,7 +6,8 @@
 docker compose up -d          # Postgres(pgvector) :5432 + Redis :6379
 cp .env.example .env
 npm install
-npx prisma db push
+npx prisma db execute --file prisma/sql/000_extensions.sql --schema prisma/schema.prisma
+npx prisma migrate deploy
 npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
 npm run db:seed
 npm run dev
@@ -26,9 +27,9 @@ npm run dev
 
 ## 3. 数据库迁移规范
 
-- W1 用 `prisma db push` 快速迭代；**W2 必须生成并提交第一份迁移文件**，之后 CI/CD 统一 `prisma migrate deploy`。
-- 迁移只做加法（加列 / 加索引 / 加表），删除与改类型拆成两次发布，保证新旧代码都能跑。
-- `prisma/sql/001_pgvector.sql` 需在 DB 就绪后执行一次：建 `vector` 扩展与 HNSW 索引。
+- 首份迁移 `prisma/migrations/20261121000000_init` 已提交，CI/CD 统一 `prisma migrate deploy`；本地开发不要再 `db push`，改 schema 后用 `npm run db:migrate` 生成新迁移。
+- 迁移前先执行 `prisma/sql/000_extensions.sql`：`CREATE EXTENSION vector` 需要管理员权限，托管 Postgres（Neon / Supabase）请在平台 SQL 编辑器先建一次；扩展已存在时该文件只是安全的 no-op。**不要**把建扩展写进迁移，否则非超级用户的应用角色会在 `migrate deploy` 直接失败。
+- `prisma/sql/001_pgvector.sql` 在迁移完成后执行一次：建 `vector` 扩展兜底与 HNSW 索引。
 - **换 embedding 模型的迁移清单**：改 `schema.prisma` 的 `vector(N)` → 改 SQL 索引 → 改 `.env` 的 `EMBEDDING_DIM` → 清空 `ContentChunk` → 全量重新切片向量化。
 
 ## 4. 上线前检查单

@@ -40,6 +40,8 @@ test('注册 → 退出 → 再次被拦截', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/dashboard/);
   await page.getByRole('button', { name: '退出' }).click();
+  // signOut() 先 await logout 再 router.push('/')，等落地首页才算会话真正清掉。
+  await expect(page).toHaveURL(/\/$/);
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login\?next=/);
 });

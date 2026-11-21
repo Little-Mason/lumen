@@ -70,8 +70,9 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --no-audit --no-fund
-      # W1 用 db push 快速同步 schema；迁移文件落地后改为 prisma migrate deploy
-      - run: npx prisma db push --skip-generate
+      # 扩展由超级用户建（CI 的 POSTGRES_USER 本身就是 superuser），迁移只由应用角色执行。
+      - run: npx prisma db execute --file prisma/sql/000_extensions.sql --schema prisma/schema.prisma
+      - run: npx prisma migrate deploy
       - run: npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
       # 认证闭环 E2E 需要一个可登录的 OWNER 账号
       - run: npm run db:seed

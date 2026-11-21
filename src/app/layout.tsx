@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Lumen
             </Link>
             <nav className="flex items-center gap-5 text-sm text-black/60">
-              <Link href="/posts/building-lumen">文章</Link>
+              <Link href="/posts">文章</Link>
               <Link href="/dashboard">工作台</Link>
               <AuthNav />
             </nav>

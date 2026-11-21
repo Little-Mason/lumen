@@ -17,11 +17,11 @@
 
 ## W2 · 11/26–12/02　内容闭环
 
-- [ ] 内容 CRUD：草稿、自动 slug、字数/阅读时长、状态流转、标签
-- [ ] 写作台：Markdown 编辑 + 预览、列表筛选、发布/下线
-- [ ] 公开站：列表、详情、标签页、Markdown 渲染、OG / sitemap / RSS
-- [ ] 单元测试覆盖 service 层；E2E 覆盖「登录 → 写 → 发布 → 前台可见」
-- [ ] **生成并提交第一份 Prisma 迁移文件，CI 从 `db push` 切到 `migrate deploy`**
+- [x] 内容 CRUD：草稿、自动 slug、字数/阅读时长、状态流转、标签
+- [x] 写作台：Markdown 编辑 + 预览、列表筛选、发布/下线
+- [x] 公开站：列表、详情、标签页、Markdown 渲染、OG / sitemap / RSS
+- [x] 单元测试覆盖 service 层（38 个用例）；E2E 覆盖「登录 → 写 → 发布 → 匿名窗口可见」
+- [x] **生成并提交第一份 Prisma 迁移文件，CI 从 `db push` 切到 `migrate deploy`**
 
 **验收**：从后台发一篇技术文章，匿名窗口能访问且 `view source` 有正确 meta 描述。
 

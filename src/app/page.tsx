@@ -1,3 +1,9 @@
+import Link from 'next/link';
+import { ContentCard } from '@/components/content-card';
+import { listPublished } from '@/server/services/content.service';
+
+export const dynamic = 'force-dynamic';
+
 const modules = [
   {
     tag: 'W1',
@@ -9,7 +15,7 @@ const modules = [
     tag: 'W2',
     name: '写作台与公开站',
     desc: 'Markdown 编辑、标签、发布、SEO / RSS / sitemap',
-    status: '待实现',
+    status: '已实现',
   },
   {
     tag: 'W3',
@@ -25,7 +31,9 @@ const modules = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const latest = await listPublished({ pageSize: 3 }).catch(() => null);
+
   return (
     <div>
       <section className="mb-12">
@@ -36,6 +44,22 @@ export default function HomePage() {
           辅助写作台， 底层的向量检索让所有内容变成可提问的个人知识库。
         </p>
       </section>
+
+      {latest && latest.items.length > 0 && (
+        <section className="mb-12">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold tracking-tight">最新发布</h2>
+            <Link href="/posts" className="text-sm text-black/50 hover:text-black/80">
+              查看全部 →
+            </Link>
+          </div>
+          <div className="grid gap-4">
+            {latest.items.map((item) => (
+              <ContentCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mb-12 grid gap-4 sm:grid-cols-2">
         {modules.map((m) => (

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
 import { NextResponse } from 'next/server';
 import { AuthError } from '@/lib/auth/errors';
+import { ContentError } from '@/lib/content/errors';
 import { logger } from '@/lib/logger';
 
 /** 全站统一错误结构，与 docs/API.md 的 ApiError 契约一致。 */
@@ -28,4 +29,24 @@ export function authFailure(error: unknown) {
   }
   logger.error('auth request failed', { error: String(error) });
   return apiError(500, 'INTERNAL_ERROR', '服务暂时不可用，请稍后重试');
+}
+
+/** 内容接口的统一异常映射：Zod → 400，领域错误 → 401/403/404/409，其余 → 500。 */
+export function contentFailure(error: unknown) {
+  if (error instanceof ZodError) {
+    return apiError(400, 'INVALID_INPUT', error.issues[0]?.message ?? '入参不合法');
+  }
+  if (error instanceof ContentError) {
+    return apiError(error.status, error.code, error.message);
+  }
+  if (error instanceof AuthError) {
+    return apiError(403, error.code, error.message);
+  }
+  logger.error('content request failed', { error: String(error) });
+  return apiError(500, 'INTERNAL_ERROR', '服务暂时不可用，请稍后重试');
+}
+
+/** 把 URLSearchParams 变成可被 Zod 解析的普通对象。 */
+export function searchParamsObject(searchParams: URLSearchParams): Record<string, string> {
+  return Object.fromEntries(searchParams.entries());
 }

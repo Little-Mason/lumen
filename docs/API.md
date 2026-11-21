@@ -27,17 +27,20 @@
 
 ## 内容
 
-| 方法   | 路径                        | 权限                 | 说明                                                                |
-| ------ | --------------------------- | -------------------- | ------------------------------------------------------------------- |
-| GET    | `/api/contents`             | 公开（仅 PUBLISHED） | `?page=1&pageSize=10&type=ARTICLE` → `Paginated<ContentDTO>`        |
-| GET    | `/api/contents/:id`         | 登录                 | 含 Markdown 全文，供编辑器加载                                      |
-| POST   | `/api/contents`             | 登录                 | 建草稿：`{ title, contentMd, type }`，自动算 slug / 字数 / 阅读时长 |
-| PATCH  | `/api/contents/:id`         | 作者                 | 更新正文、标题、标签、状态；正文变化时标记待重新切片                |
-| DELETE | `/api/contents/:id`         | 作者                 | 软归档（`ARCHIVED`），不物理删除                                    |
-| POST   | `/api/contents/:id/publish` | 作者                 | 置 `PUBLISHED` + `publishedAt`，触发缓存失效与向量化                |
-| GET    | `/api/tags`                 | 公开                 | 标签列表及计数                                                      |
+| 方法   | 路径                          | 权限                 | 说明                                                                                                       |
+| ------ | ----------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/contents`               | 公开（仅 PUBLISHED） | ✅ `?page=1&pageSize=10&type=ARTICLE&tag=<slug>&q=` → `Paginated<ContentListItemDTO>`                      |
+| GET    | `/api/contents/:id`           | 登录（作者）         | ✅ 含 Markdown 全文，供编辑器加载                                                                          |
+| POST   | `/api/contents`               | 登录                 | ✅ 建草稿：`{ title, contentMd, type?, excerpt?, coverUrl?, tags? }`，自动算 slug / 摘要 / 字数 / 阅读时长 |
+| PATCH  | `/api/contents/:id`           | 作者                 | ✅ 更新正文、标题、标签、状态；改正文会重算字数与摘要，slug 保持不变                                       |
+| DELETE | `/api/contents/:id`           | 作者                 | ✅ 软归档（`ARCHIVED`），不物理删除                                                                        |
+| POST   | `/api/contents/:id/publish`   | 作者                 | ✅ 置 `PUBLISHED` + `publishedAt`，幂等                                                                    |
+| POST   | `/api/contents/:id/unpublish` | 作者                 | ✅ 下线回 `DRAFT`，保留 `publishedAt` 历史                                                                 |
+| GET    | `/api/tags`                   | 公开                 | ✅ 标签列表及已发布内容计数                                                                                |
 
 公开阅读页由 RSC 直接查库，不经 HTTP API；上表用于后台与外部集成。
+写接口统一经 `requireUser()`：校验 JWT 且确认账号仍在库中，删号后旧 Cookie 立即失效。
+状态流转由 `canTransition()` 约束；非法流转返回 `409 INVALID_TRANSITION`，越权返回 `403 FORBIDDEN`。
 
 ## AI
 
@@ -77,6 +80,6 @@
 `/`（首页）、`/posts/[slug]`（详情）、`/tags/[slug]`、`/dashboard`（工作台）、`/login`。
 `sitemap.xml`、`robots.txt`、`rss.xml` 由 Route Handler 生成（W2）。
 
-> v0.1 已实现 `/api/health` 与 `/api/auth/*`（门禁 B 认证闭环）。其余为**契约先行**：service 层与类型已定义，W2/W3 按本表实现，避免边写边改接口。
+> v0.2 已实现 `/api/health`、`/api/auth/*` 与全部 `/api/contents/*`、`/api/tags`（W2 内容闭环）。`/sitemap.xml`、`/rss.xml` 由 Route Handler 输出，`/robots.txt` 为静态文件。AI 相关接口仍是**契约先行**：service 层与类型已定义，W3 按本表实现，避免边写边改接口。
 >
 > 认证细节：`AUTH_SECRET` 签 HS256 JWT，7 天有效；Cookie 为 `httpOnly + sameSite=lax`，生产环境加 `secure`。`src/middleware.ts` 只用 jose 校验签名（Edge 安全，不查库、不引 bcrypt），未登录访问 `/dashboard*` 跳转 `/login?next=...`；业务权限仍由 service 层判定。注册首个账号后默认关闭，需配置 `AUTH_INVITE_CODE`。登录失败会做一次固定 bcrypt 比较，避免用响应时间枚举邮箱。

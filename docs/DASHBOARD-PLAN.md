@@ -250,7 +250,7 @@ export default function Page() {
    build-args: |
      NEXT_PUBLIC_SITE_URL=${{ vars.APP_URL }}
    ```
-3. **迁移方式仍是 W1 做法**：`deploy.yml` 第 58 行与 `ci.yml` 第 72 行都是 `prisma db push`。W2 生成首份迁移后统一改成 `npx prisma migrate deploy`，否则生产库会漂移。
+3. **迁移方式仍是 W1 做法**（2026-11-21 已修复）：`deploy.yml` 与 `ci.yml` 原先都是 `prisma db push`。W2 已生成首份迁移 `20261121000000_init`，两条流水线统一改成 `000_extensions.sql` → `prisma migrate deploy` → `001_pgvector.sql`，生产库不再漂移。
 4. **deploy.yml 会自动触发**：`workflow_run` 只要 main 的 CI 成功就跑。secrets 没配时必然红灯。建议给 `jobs.deploy.if` 加 `vars.DEPLOY_ENABLED == 'true' &&`，W4 准备上线时再打开。
 
 ## 8. 注意事项
@@ -269,7 +269,8 @@ cd /d/workspace/lumen
 npm run dev                                   # 启动
 npm run lint && npm run typecheck && npm test  # 每次改完
 npm run db:validate                            # schema 校验
-npm run db:migrate                             # W2 生成首份迁移
+npm run db:deploy                              # 应用迁移（W2 起）
+npm run db:migrate                             # 改 schema 后生成新迁移
 npm run db:seed                                # 种子数据
 npm run test:e2e                               # 需 DB 起好
 git add -A && git commit -m "..." && git push  # 触发 CI
@@ -293,4 +294,34 @@ Docker 侧的前置问题也一并结束：用户启用 `HypervisorPlatform`、�
 
 安全取舍：首个账号自动 OWNER，之后需 `AUTH_INVITE_CODE`；登录失败统一 401 且用固定 bcrypt 哈希抵消时间差；`next` 在服务端校验，拒绝 `//` 开头的开放重定向；`/api/auth/me` 以数据库为准，删号后旧 JWT 立即失效。
 
-CI 同步改动：`env.AUTH_INVITE_CODE=lumen-dev-invite`（与本机 `.env` 一致）；e2e job 在 `prisma db push` + pgvector DDL 之后增加 `npm run db:seed`；`tests/e2e/smoke.spec.ts` 改为覆盖「未登录拦截 → 种子账号登录 → 邀请码注册 → 退出后再次被拦截」。下一步是 **Step 2 内容模块**（`/api/contents` CRUD + 写作台）。
+CI 同步改动：`env.AUTH_INVITE_CODE=lumen-dev-invite`（与本机 `.env` 一致）；e2e job 在 `prisma db push` + pgvector DDL 之后增加 `npm run db:seed`；`tests/e2e/smoke.spec.ts` 改为覆盖「未登录拦截 → 种子账号登录 → 邀请码注册 → 退出后再次被拦截」。
+
+## 11. Step 2 · 内容闭环（2026-11-21 完成）
+
+W1 遗留的两个 CI 红灯先修掉，再动业务代码：
+
+| 失败点                                       | 根因                                                                                        | 修法                                                                                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| E2E job `psql "$DATABASE_URL" -f ...` 退出 2 | `?schema=public` 是 Prisma 专用 URI 参数，`psql` 报 `invalid URI query parameter: "schema"` | 改用 `npx prisma db execute --file ... --schema prisma/schema.prisma`                                                                      |
+| `image` job `"/app/public": not found`       | `public/` 是空目录，Git 不跟踪，CI checkout 里不存在                                        | 新增被跟踪的 `public/robots.txt`；补 `.dockerignore` 防止 `.env` 进构建上下文；Dockerfile 改 `npm ci`、构建期 env 从 `ARG` 改为 `RUN` 内联 |
+
+顺带修掉的 E2E 竞态：`signOut()` 是「先 await logout 再 `router.push('/')`」，旧用例点完退出立刻 `goto('/dashboard')`，Cookie 还没清掉。现在先等地址落到 `/` 再断言拦截。
+
+内容模块分层：
+
+| 层         | 文件                                                                    | 职责                                                                                   |
+| ---------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 纯领域函数 | `src/lib/content/domain.ts`                                             | 状态流转白名单、摘要提取、标签归一化、标签 slug、slug 重试、percent-encoded 参数解码   |
+| 入参校验   | `src/lib/content/validation.ts`                                         | Zod：create / update / list                                                            |
+| 业务编排   | `src/server/services/content.service.ts`                                | 公开列表、作者列表、详情、建草稿、局部更新、发布/下线/归档、标签计数、sitemap/RSS 摘要 |
+| HTTP       | `src/app/api/contents/**`、`src/app/api/tags/route.ts`                  | 统一错误结构；写接口经 `requireUser()` 校验 JWT + 账号仍在库                           |
+| 后台 UI    | `src/app/dashboard/content/**`、`src/components/content-editor.tsx`     | 筛选列表、Markdown 双栏编辑 + 实时预览、发布/下线/归档                                 |
+| 公开站     | `src/app/posts/**`、`src/app/tags/[slug]`、`src/app/page.tsx`           | 列表、详情（title/description/OG/canonical）、标签页、首页最新发布                     |
+| 站点输出   | `src/app/sitemap.xml/route.ts`、`rss.xml/route.ts`、`public/robots.txt` | 读真实已发布内容                                                                       |
+
+两个实测踩坑：
+
+- **中文 slug 404**：`slugify()` 会保留中文，动态路由参数却是 percent-encoded。加 `normalizeSlugParam()`（只在含 `%HH` 时解码）后，`/posts/chinese-slug-%E4%B8%AD...` 正确返回 200，标题、description、`og:type=article`、canonical 全部正确。
+- **建扩展不能进迁移**：本地原生 PostgreSQL 的 `lumen` 角色不是超级用户，`CREATE EXTENSION vector` 报 `42501`。把扩展拆到迁移前的 `000_extensions.sql`（管理员执行；扩展已存在时是安全 no-op），迁移只建表。用临时库实测「管理员建扩展 → 000 → `migrate deploy` → 001」得到 7 张表 + `content_chunk_embedding_hnsw` 索引；本机 `lumen` 库用 `migrate resolve --applied` 无损基线。
+
+验收：lint / typecheck / 38 个单测全绿；HTTP 冒烟覆盖健康检查、公开页、未登录 401/307、建草稿（slug/字数/摘要/标签去重）、局部更新（slug 不变）、发布、匿名访问 meta、下线、软归档；测试内容已物理清理，公开列表恢复为 1 篇种子文章。下一步是 **W3 AI 与 RAG**。
