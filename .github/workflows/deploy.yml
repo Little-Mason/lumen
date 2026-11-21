@@ -34,7 +34,22 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      # 未接生产平台时只发布 GHCR 镜像，跳过迁移与健康检查，避免 CD 长期红灯。
+      - name: Detect production configuration
+        id: config
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "${{ vars.APP_URL }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::DATABASE_URL / APP_URL not configured; publishing the image only."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: docker/setup-buildx-action@v3
+      # OCI 镜像名必须全小写；github.repository 里的 owner 含大写字母会直接被 buildx 拒绝。
+      - name: Normalize image name
+        id: image
+        run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -45,24 +60,30 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ steps.image.outputs.name }}:sha-${{ github.sha }}
+            ghcr.io/${{ steps.image.outputs.name }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       # 迁移与业务发布解耦：先改库，再发版本，保证向前兼容
       - uses: actions/setup-node@v4
+        if: steps.config.outputs.ready == 'true'
         with:
           node-version: 22
       - run: npm ci --no-audit --no-fund
+        if: steps.config.outputs.ready == 'true'
       - run: npx prisma db execute --file prisma/sql/000_extensions.sql --schema prisma/schema.prisma
+        if: steps.config.outputs.ready == 'true'
       - run: npx prisma migrate deploy
+        if: steps.config.outputs.ready == 'true'
       - run: npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
+        if: steps.config.outputs.ready == 'true'
 
       # 平台部署二选一（在仓库 Secrets 里配好其一即可）：
       # Vercel: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
       # Railway: railway up --service lumen -- ${{ secrets.RAILWAY_TOKEN }}
       - name: Post-deploy health check
+        if: steps.config.outputs.ready == 'true'
         run: |
           for i in $(seq 1 20); do
             code=$(curl -s -o /dev/null -w '%{http_code}' "${{ vars.APP_URL }}/api/health" || true)

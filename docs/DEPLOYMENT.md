@@ -25,6 +25,8 @@ npm run dev
 
 **域名与 HTTPS**：平台托管证书即可；`NEXT_PUBLIC_SITE_URL` 设为正式域名，影响 OG、sitemap、RSS 的绝对地址。
 
+**AI provider**：`AI_PROVIDER` 默认是 `mock`（确定性假模型，零密钥零 token），本地与 CI 都跑它。生产环境必须在平台的环境变量里显式设 `AI_PROVIDER=openai-compatible`，并配好 `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` 与 embedding 对应变量，否则线上写作助手会一直返回 mock 内容。Redis 可选：不配 `REDIS_URL` 时自动降级为进程内限流（单实例够用，多实例请接 Redis）。
+
 ## 3. 数据库迁移规范
 
 - 首份迁移 `prisma/migrations/20261121000000_init` 已提交，CI/CD 统一 `prisma migrate deploy`；本地开发不要再 `db push`，改 schema 后用 `npm run db:migrate` 生成新迁移。
