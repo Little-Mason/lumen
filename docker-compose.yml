@@ -7,8 +7,9 @@ services:
       POSTGRES_USER: lumen
       POSTGRES_PASSWORD: lumen
       POSTGRES_DB: lumen
+    # 本机 5432 已被原生 PostgreSQL 占用，容器内库映射到 5433 避免冲突。
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - lumen-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -27,14 +28,35 @@ services:
     volumes:
       - lumen-redisdata:/data
 
-  # 可选：整站容器化，与 CI 产出的镜像保持一致
-  # app:
-  #   image: ghcr.io/<owner>/lumen:latest
-  #   env_file: .env
-  #   ports: ['3000:3000']
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
+  # 整站容器化：与 CI 产出的镜像同一份 Dockerfile，用 profile 显式开启。
+  # 启动：docker compose --profile app up -d --build
+  # 本机 dev server 占用 3000，因此映射到 3100；健康检查失败会如实标记 unhealthy。
+  app:
+    profiles: ['app']
+    build: .
+    image: lumen:local
+    container_name: lumen-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://lumen:lumen@db:5432/lumen?schema=public
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_SITE_URL: http://localhost:3100
+      PORT: '3000'
+      HOSTNAME: '0.0.0.0'
+    ports:
+      - '3100:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'node', 'healthcheck.mjs']
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
 
 volumes:
   lumen-pgdata:

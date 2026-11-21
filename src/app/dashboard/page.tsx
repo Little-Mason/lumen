@@ -19,14 +19,14 @@ const cards = [
   },
   {
     title: '用量与成本',
-    desc: '按天看调用量、token、成本、失败率、P95 延迟',
-    milestone: 'W4',
+    desc: '按天看调用量、token、成本、失败率、P95 延迟与月度预算',
+    milestone: '已实现',
     href: '/dashboard/usage',
   },
   {
     title: '发布日历',
-    desc: '自媒体排期与连载更新节奏',
-    milestone: 'W4',
+    desc: '月视图发布节奏、连更统计与断更提醒',
+    milestone: '已实现',
     href: '/dashboard/calendar',
   },
 ] as const;
@@ -38,7 +38,7 @@ export default async function DashboardPage() {
     <div>
       <h1 className="mb-2 text-3xl font-semibold tracking-tight">工作台</h1>
       <p className="mb-2 text-sm text-black/55">
-        四个模块按 W2 → W3 → W4 顺序落地。卡片已可点击进入各自的页面。
+        四个模块已全部接入真实数据：内容、AI 辅助、用量与成本、发布日历。
       </p>
       {session && (
         <p className="mb-4 text-xs text-black/45">

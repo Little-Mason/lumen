@@ -28,6 +28,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
+COPY scripts/healthcheck.mjs ./healthcheck.mjs
 USER nextjs
 EXPOSE 3000
+# DB 不通时 /api/health 返回 503，容器会如实变成 unhealthy，不伪装成健康。
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["node", "healthcheck.mjs"]
 CMD ["node", "server.js"]

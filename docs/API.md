@@ -77,20 +77,21 @@
 
 **限流与降级**：每用户 `AI_RATE_LIMIT_PER_MIN`（默认 20）次/分钟；配置 `REDIS_URL` 时走 Redis `INCR + EXPIRE`，否则降级到进程内计数器。月度预算按当月 `AiJob.costCents` 汇总，超限返回 `429 BUDGET_EXCEEDED`；限流返回 `429 RATE_LIMITED` 并带 `Retry-After`。模型失败返回 `502 PROVIDER_ERROR`。成本为估算口径（非账单）。
 
-**未实现的契约**：`/api/ai/usage` 与 `/api/analytics/overview` 属于 W4 用量看板，暂未开放。
+**W4 看板接口（已实现）**：`GET /api/ai/usage?days=1..90` 返回 `UsageSummaryDTO`（按天序列、按能力/模型聚合、失败率、P50/P95、月度预算、最近失败）；`GET /api/calendar?month=YYYY-MM` 返回 `CalendarDTO`（月网格、条目、连更统计）。两者都要求登录，只返回当前用户的数据；聚合逻辑在 `src/lib/usage/metrics.ts` 与 `src/lib/calendar/grid.ts` 的纯函数层。`/api/analytics/overview` 仍未实现，不要按旧契约调用。
 
 ## 运维
 
-| 方法 | 路径                      | 说明                                                                        |
-| ---- | ------------------------- | --------------------------------------------------------------------------- |
-| GET  | `/api/health`             | `{ status, db, version, latencyMs }`；DB 不可用时 503，供 CI 与容器探针使用 |
-| GET  | `/api/analytics/overview` | 登录；看板聚合数据                                                          |
+| 方法 | 路径                       | 说明                                                                        |
+| ---- | -------------------------- | --------------------------------------------------------------------------- |
+| GET  | `/api/health`              | `{ status, db, version, latencyMs }`；DB 不可用时 503，供 CI 与容器探针使用 |
+| GET  | `/api/ai/usage?days=30`    | 登录；当前用户最近 N 天（1–90）的调用量、成本、失败率、P95 与预算          |
+| GET  | `/api/calendar?month=YYYY-MM` | 登录；指定月份的发布网格、条目与连更统计                                  |
 
 ## 前端页面
 
-`/`（首页）、`/posts/[slug]`（详情）、`/tags/[slug]`、`/dashboard`（工作台）、`/dashboard/content`、`/dashboard/ai`、`/login`。
+`/`（首页）、`/posts/[slug]`（详情）、`/tags/[slug]`、`/dashboard`（工作台）、`/dashboard/content`、`/dashboard/ai`、`/dashboard/usage`、`/dashboard/calendar`、`/login`。
 `sitemap.xml`、`rss.xml` 由 Route Handler 生成，`robots.txt` 为静态文件。
 
-> v0.3 已实现 `/api/health`、`/api/auth/*`、全部 `/api/contents/*`、`/api/tags` 与 AI 三件套（`/api/ai/run`、`/api/ai/ask`、`/api/ai/jobs`）。AI 默认走确定性 mock provider，填入密钥并把 `AI_PROVIDER` 改为 `openai-compatible` 即可切真模型，业务代码不变。
+> v0.4 已实现 `/api/health`、`/api/auth/*`、全部 `/api/contents/*`、`/api/tags`、AI 三件套（`/api/ai/run`、`/api/ai/ask`、`/api/ai/jobs`）与 W4 看板接口（`/api/ai/usage`、`/api/calendar`）。AI 默认走确定性 mock provider，填入密钥并把 `AI_PROVIDER` 改为 `openai-compatible` 即可切真模型，业务代码不变。
 >
 > 认证细节：`AUTH_SECRET` 签 HS256 JWT，7 天有效；Cookie 为 `httpOnly + sameSite=lax`，生产环境加 `secure`。`src/middleware.ts` 只用 jose 校验签名（Edge 安全，不查库、不引 bcrypt），未登录访问 `/dashboard*` 跳转 `/login?next=...`；业务权限仍由 service 层判定。注册首个账号后默认关闭，需配置 `AUTH_INVITE_CODE`。登录失败会做一次固定 bcrypt 比较，避免用响应时间枚举邮箱。

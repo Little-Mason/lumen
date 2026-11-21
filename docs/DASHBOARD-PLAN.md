@@ -7,6 +7,8 @@
 > **20:45 更新**：Docker 本体已修好但不再作为开发数据库。把 `settings-store.json` 的 `EngineTypeWindows` 从 `wsl2` 改成 `docker-vmm`（备份 `settings-store.json.bak-wsl2`）后，由用户自己双击桌面快捷方式启动（避开 `wsl.exe` 程序黑名单），引擎正常起来：`docker version` Server = Docker Desktop 4.99.0 / Engine 29.9.3 / linux/amd64，context `desktop-linux`，`docker compose config` 能解析出 `db` + `redis`。**遗留限制**：本机到 `registry-1.docker.io:443` 直连和代理都超时，`docker run hello-world` 拉不到镜像，`docker compose up -d` 暂时不可用；CI/CD 在 GitHub Actions 上构建镜像，不受影响。开发继续用 A4 原生 PostgreSQL，不改 `.env`。如需本机跑容器，要先给 Docker Desktop 配可用的 HTTPS 代理或可用的 registry mirror，再重启引擎。
 > **2026-11-21 14:45 更新**：Docker 侧已全部修好（HypervisorPlatform 负载 + ≥4GB 内存 + `registry-mirrors`），容器创建/启动/`exec` 均通过；但本机 5432 被原生 PostgreSQL 占用，开发库仍用 A4 原生实例，只起 Redis 用 `docker compose up -d redis`。**W3 已落地**：`/dashboard/ai` 从占位页换成真实 AI 工作台（写作助手 / 知识库问答 / 调用记录），写作台编辑器内嵌 AI 工具条；`/api/ai/{run,ask,jobs}` 与 `/api/contents/:id/reindex` 已接真实 DB 与 HNSW 索引，默认 mock provider 零 token。四模块中仅 `/dashboard/usage`、`/dashboard/calendar` 仍是 W4 占位。
 
+> **2026-11-21 19:50 更新**：四模块全部接入真实数据。`/dashboard/usage` 按天聚合 `AiJob`（调用量、成本、失败率、P50/P95、按能力/模型分组、月度预算、最近失败），`/dashboard/calendar` 用 `Content.publishedAt` 生成月视图与连更统计；对应 `GET /api/ai/usage`、`GET /api/calendar`。日历刻意不实现拖拽排期与定时发布——它是真实节奏的只读视图，不伪造未来排期。W1 遗留的 `/api/health` 容器健康检查也随本次收尾（Dockerfile `HEALTHCHECK` + compose `--profile app`）。
+
 ## 0. 当前运行态（今日实测）
 
 | 路由                                               | 实测 | 说明                                                      |
@@ -213,6 +215,8 @@ export default function Page() {
 - `src/app/dashboard/calendar/page.tsx`，按 `Content.publishedAt` 月视图分组，草稿可排期；与打卡表的「每周 1 篇技术文」对齐。
 
 **DoD**：月视图显示已发布与排期条目，改排期后公开站发布时间一致。
+
+> **2026-11-21 实际交付**（Step 4 + Step 5）：`/api/ai/usage` 与 `/api/calendar` 已开放，两张页面从占位换成真实数据；Step 4 的 DoD 全部达成（调用可见、失败计入失败率、预算 429 由 `assertAiQuota` 保证）。Step 5 只做到**只读月视图**：拖拽改排期与定时发布没有实现，因为 `Content` 没有 `scheduledAt`，与其造一个会影响公开站时间的假字段，不如诚实地把日历定位成节奏复盘工具。这项取舍已写进页面与 README。
 
 ## 5. 什么时候适合部署
 

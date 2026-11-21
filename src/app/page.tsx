@@ -21,13 +21,13 @@ const modules = [
     tag: 'W3',
     name: 'AI 能力与 RAG',
     desc: '大纲 / 润色 / 摘要 / 标签 / 标题，知识库问答与流式输出',
-    status: '契约已定义',
+    status: '已实现',
   },
   {
     tag: 'W4',
     name: '数据看板与上线',
     desc: 'AI 成本与用量、发布日历、CI/CD、部署与监控',
-    status: '流水线已就位',
+    status: '看板已实现 · 待上线',
   },
 ];
 

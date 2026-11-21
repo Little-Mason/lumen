@@ -79,4 +79,4 @@ CI 中 AI 相关 E2E 用 mock provider，**不消耗真实 token**。
 
 **维度约束**：`ContentChunk.embedding` 是 `vector(1536)`；`EMBEDDING_DIM` 不等于 1536 时 `embedTexts()` 会主动抛 `DIM_MISMATCH`，提示同步改 schema、`001_pgvector.sql` 并重建切片表，避免写入时才发现维度不匹配。
 
-**已知取舍**：结果缓存是进程内 24h Map，多实例不共享（可接受，命中只是省钱）；mock embedding 是哈希词袋，只保证「含相同词的文本更相近」，用于可复现的检索演示，真实语义检索必须切真 embedding 模型。用量看板（按天聚合、P95）留在 W4。
+**已知取舍**：结果缓存是进程内 24h Map，多实例不共享（可接受，命中只是省钱）；mock embedding 是哈希词袋，只保证「含相同词的文本更相近」，用于可复现的检索演示，真实语义检索必须切真 embedding 模型。用量看板已在 W4 落地（`/dashboard/usage` + `GET /api/ai/usage`，按天聚合、失败率、P95 与月度预算）。

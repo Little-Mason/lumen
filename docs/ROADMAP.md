@@ -9,7 +9,7 @@
 - [x] CI 流水线（lint / typecheck / schema / unit / build / E2E / 镜像）
 - [x] 架构文档、接口契约、部署与面试文档
 - [x] 认证闭环：注册 / 登录 / 登出 / 会话校验中间件（Gate B，commit `176485d`）
-- [ ] `/api/health` 在容器与健康检查中返回 200
+- [x] `/api/health` 在容器与健康检查中返回 200（Dockerfile `HEALTHCHECK` + compose `--profile app` 实测）
 
 **验收**：push 到 main 后 CI 全绿；本地 `npm run dev` 能打开首页与工作台；`db push` 无报错。
 
@@ -43,13 +43,15 @@
 
 ## W4 · 12/10–12/19　上线与包装
 
-- [ ] 用量看板：调用量、成本、失败率、P95 延迟、发布日历
+- [x] 用量看板：调用量、成本、失败率、P95 延迟、发布日历（`/dashboard/usage` + `/dashboard/calendar`）
 - [ ] 生产部署：托管 Postgres + 应用平台 + 自定义域名 + HTTPS + Sentry
 - [ ] 发布流水线：迁移 → 镜像 → 健康检查 → 失败回滚演练一次
 - [ ] 产出 2 篇技术文章（架构选型 / RAG 落地踩坑），发布到 Lumen 自身并同步自媒体
 - [ ] README 补演示视频与截图；`docs/INTERVIEW.md` 补真实指标
 
 **验收**：在线链接可访问、CI→CD 全自动、README 让陌生人 5 分钟跑起来；简历项目描述能讲 3 分钟。
+
+**W4 阶段进度（2026-11-21）**：看板与发布日历已交付，Dockerfile `HEALTHCHECK` 与 compose app service 已实测；CI → CD 链路已首次全绿（`47f062e` 修复了 GHCR 大写 owner 导致镜像 tag 被拒、并在未配生产 secrets 时只推镜像不跑迁移）。**仍待完成**：配置生产 secrets / 域名真正上线、2 篇技术文章、演示视频与截图、`docs/INTERVIEW.md` 的线上真实指标、一次失败健康检查的回滚演练。
 
 ## 之后的维护节奏（12/20 起）
 

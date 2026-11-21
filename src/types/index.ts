@@ -88,3 +88,111 @@ export type RagSourceDTO = {
   similarity: number;
   preview: string;
 };
+
+// ---- W4 · 用量与成本 ----
+
+export type UsageDailyPoint = {
+  date: string;
+  calls: number;
+  successes: number;
+  failures: number;
+  costCents: number;
+  tokens: number;
+  p95LatencyMs: number;
+};
+
+export type UsageBreakdown = {
+  key: string;
+  calls: number;
+  failures: number;
+  costCents: number;
+  p95LatencyMs: number;
+};
+
+export type UsageTotals = {
+  totalCalls: number;
+  successCalls: number;
+  failedCalls: number;
+  pendingCalls: number;
+  /** 0–1，失败数 / 已结束调用数（PENDING 不计入分母）。 */
+  failureRate: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costCents: number;
+  p50LatencyMs: number;
+  p95LatencyMs: number;
+  byKind: UsageBreakdown[];
+  byModel: UsageBreakdown[];
+  series: UsageDailyPoint[];
+};
+
+export type UsageBudget = {
+  spentCents: number;
+  limitCents: number;
+  usedPercent: number;
+  remainingCents: number;
+  exceeded: boolean;
+};
+
+export type UsageFailureDTO = {
+  id: string;
+  kind: AiJobKind;
+  error: string | null;
+  latencyMs: number;
+  createdAt: string;
+};
+
+export type UsageSummaryDTO = {
+  generatedAt: string;
+  days: number;
+  provider: 'mock' | 'openai-compatible';
+  model: string;
+  totals: UsageTotals;
+  budget: UsageBudget;
+  recentFailures: UsageFailureDTO[];
+};
+
+// ---- W4 · 发布日历 ----
+
+export type CalendarItemDTO = {
+  id: string;
+  title: string;
+  slug: string;
+  type: ContentType;
+  status: ContentStatus;
+  /** UTC YYYY-MM-DD：已发布用 publishedAt，草稿/评审用 updatedAt。 */
+  date: string;
+  publishedAt: string | null;
+  wordCount: number;
+  href: string;
+};
+
+export type CalendarCellDTO = {
+  date: string;
+  day: number;
+  inMonth: boolean;
+  isToday: boolean;
+  items: CalendarItemDTO[];
+};
+
+export type CalendarStatsDTO = {
+  publishedCount: number;
+  chapterCount: number;
+  draftCount: number;
+  publishDays: number;
+  longestStreak: number;
+  totalWords: number;
+  lastPublishedAt: string | null;
+  daysSinceLastPublish: number | null;
+};
+
+export type CalendarDTO = {
+  month: string;
+  label: string;
+  prevMonth: string;
+  nextMonth: string;
+  cells: CalendarCellDTO[];
+  items: CalendarItemDTO[];
+  stats: CalendarStatsDTO;
+};

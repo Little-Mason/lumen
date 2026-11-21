@@ -25,6 +25,23 @@ npm run dev
 
 **域名与 HTTPS**：平台托管证书即可；`NEXT_PUBLIC_SITE_URL` 设为正式域名，影响 OG、sitemap、RSS 的绝对地址。
 
+**本机整站容器化（W4 已实测）**：`Dockerfile` 内置 `HEALTHCHECK`，探针 `scripts/healthcheck.mjs` 只认 `/api/health` 的 200；DB 不通时返回 503，容器会如实变成 unhealthy。`docker-compose.yml` 的 app service 放在 `app` profile 里，默认不启动，避免和本机 dev server / 原生 PostgreSQL 抢端口：
+
+```bash
+# db 映射到宿主 5433，app 映射到 3100
+docker compose --profile app up -d --build
+# 首次启动需从宿主对容器库执行迁移链（POSTGRES_USER=lumen 本身是超级用户）
+DATABASE_URL='postgresql://lumen:lumen@localhost:5433/lumen?schema=public' \
+  npx prisma db execute --file prisma/sql/000_extensions.sql --schema prisma/schema.prisma
+DATABASE_URL='postgresql://lumen:lumen@localhost:5433/lumen?schema=public' npx prisma migrate deploy
+DATABASE_URL='postgresql://lumen:lumen@localhost:5433/lumen?schema=public' \
+  npx prisma db execute --file prisma/sql/001_pgvector.sql --schema prisma/schema.prisma
+curl -s http://localhost:3100/api/health   # {"status":"ok","db":"up",...}
+docker inspect --format '{{.State.Health.Status}}' lumen-app   # healthy
+```
+
+收尾用 `docker compose --profile app down` 停掉整栈，再 `docker compose up -d redis` 恢复开发用 Redis。
+
 **AI provider**：`AI_PROVIDER` 默认是 `mock`（确定性假模型，零密钥零 token），本地与 CI 都跑它。生产环境必须在平台的环境变量里显式设 `AI_PROVIDER=openai-compatible`，并配好 `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` 与 embedding 对应变量，否则线上写作助手会一直返回 mock 内容。Redis 可选：不配 `REDIS_URL` 时自动降级为进程内限流（单实例够用，多实例请接 Redis）。
 
 ## 3. 数据库迁移规范
