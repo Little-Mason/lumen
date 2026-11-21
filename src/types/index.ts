@@ -59,4 +59,32 @@ export type AiJobResult = {
   completionTokens: number;
   costCents: number;
   latencyMs: number;
+  /** 命中 24h 结果缓存，未产生新的模型调用。 */
+  cached?: boolean;
+};
+
+export type AiJobStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+
+export type AiJobDTO = {
+  id: string;
+  kind: AiJobKind;
+  status: AiJobStatus;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  costCents: number;
+  latencyMs: number;
+  error: string | null;
+  contentTitle: string | null;
+  createdAt: string;
+};
+
+/** SSE done 事件里附带的引用信息。 */
+export type RagSourceDTO = {
+  contentId: string;
+  chunkIndex: number;
+  title: string;
+  slug: string;
+  similarity: number;
+  preview: string;
 };

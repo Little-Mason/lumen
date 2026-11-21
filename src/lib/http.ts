@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { NextResponse } from 'next/server';
 import { AuthError } from '@/lib/auth/errors';
 import { ContentError } from '@/lib/content/errors';
+import { AiError } from '@/lib/ai/errors';
 import { logger } from '@/lib/logger';
 
 /** 全站统一错误结构，与 docs/API.md 的 ApiError 契约一致。 */
@@ -43,6 +44,28 @@ export function contentFailure(error: unknown) {
     return apiError(403, error.code, error.message);
   }
   logger.error('content request failed', { error: String(error) });
+  return apiError(500, 'INTERNAL_ERROR', '服务暂时不可用，请稍后重试');
+}
+
+/** AI 接口的统一异常映射：Zod → 400，AiError → 4xx/502，未登录 → 401/403，其余 → 500。 */
+export function aiFailure(error: unknown) {
+  if (error instanceof ZodError) {
+    return apiError(400, 'INVALID_INPUT', error.issues[0]?.message ?? '入参不合法');
+  }
+  if (error instanceof AiError) {
+    const response = apiError(error.status, error.code, error.message);
+    if (error.retryAfterSeconds) {
+      response.headers.set('Retry-After', String(error.retryAfterSeconds));
+    }
+    return response;
+  }
+  if (error instanceof ContentError) {
+    return apiError(error.status, error.code, error.message);
+  }
+  if (error instanceof AuthError) {
+    return apiError(403, error.code, error.message);
+  }
+  logger.error('ai request failed', { error: String(error) });
   return apiError(500, 'INTERNAL_ERROR', '服务暂时不可用，请稍后重试');
 }
 

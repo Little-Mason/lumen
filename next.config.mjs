@@ -3,6 +3,9 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'standalone',
+  // Defaults to .next; override only for isolated local builds on Windows,
+  // where a running dev server would otherwise lock the same directory.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   async headers() {
     return [
       {

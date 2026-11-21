@@ -5,6 +5,7 @@
 > **17:50 更新**：Step 1 已完成并验收（见第 3 节）；下方第 0 节表格为修复前的历史实测，四个子路由现已 200。  
 > **19:20 更新**：门禁 A 已通过，`/api/health` 返回 200 `{"status":"ok","db":"up"}`。本机 Docker Desktop 因 Windows CBS 挂起事务（Hyper-V 负载未落地 System32、`WslVirtualMachinePlatformNotEnabled`）无法启动引擎，改用 **A4 Windows 原生 PostgreSQL 16.16 + pgvector 0.8.7**，不依赖 Docker / WSL。四个模块现在可以开始接真实数据。
 > **20:45 更新**：Docker 本体已修好但不再作为开发数据库。把 `settings-store.json` 的 `EngineTypeWindows` 从 `wsl2` 改成 `docker-vmm`（备份 `settings-store.json.bak-wsl2`）后，由用户自己双击桌面快捷方式启动（避开 `wsl.exe` 程序黑名单），引擎正常起来：`docker version` Server = Docker Desktop 4.99.0 / Engine 29.9.3 / linux/amd64，context `desktop-linux`，`docker compose config` 能解析出 `db` + `redis`。**遗留限制**：本机到 `registry-1.docker.io:443` 直连和代理都超时，`docker run hello-world` 拉不到镜像，`docker compose up -d` 暂时不可用；CI/CD 在 GitHub Actions 上构建镜像，不受影响。开发继续用 A4 原生 PostgreSQL，不改 `.env`。如需本机跑容器，要先给 Docker Desktop 配可用的 HTTPS 代理或可用的 registry mirror，再重启引擎。
+> **2026-11-21 14:45 更新**：Docker 侧已全部修好（HypervisorPlatform 负载 + ≥4GB 内存 + `registry-mirrors`），容器创建/启动/`exec` 均通过；但本机 5432 被原生 PostgreSQL 占用，开发库仍用 A4 原生实例，只起 Redis 用 `docker compose up -d redis`。**W3 已落地**：`/dashboard/ai` 从占位页换成真实 AI 工作台（写作助手 / 知识库问答 / 调用记录），写作台编辑器内嵌 AI 工具条；`/api/ai/{run,ask,jobs}` 与 `/api/contents/:id/reindex` 已接真实 DB 与 HNSW 索引，默认 mock provider 零 token。四模块中仅 `/dashboard/usage`、`/dashboard/calendar` 仍是 W4 占位。
 
 ## 0. 当前运行态（今日实测）
 

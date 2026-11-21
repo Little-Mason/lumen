@@ -20,6 +20,16 @@ const schema = z.object({
   EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
   EMBEDDING_DIM: z.coerce.number().int().positive().default(1536),
 
+  // mock 是默认值：没有密钥也能跑完整 AI 闭环，CI 不消耗真实 token。
+  // 填入 AI_API_KEY / EMBEDDING_API_KEY 后把此值改为 openai-compatible 即可切真模型。
+  AI_PROVIDER: z.enum(['mock', 'openai-compatible']).default('mock'),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+  AI_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
+  AI_MOCK_LATENCY_MS: z.coerce.number().int().min(0).max(2000).default(0),
+  RAG_TOP_K: z.coerce.number().int().min(1).max(20).default(5),
+  CHUNK_SIZE: z.coerce.number().int().min(200).max(2000).default(700),
+  CHUNK_OVERLAP: z.coerce.number().int().min(0).max(300).default(80),
+
   AI_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(20),
   AI_MONTHLY_BUDGET_CENTS: z.coerce.number().int().positive().default(3000),
   REDIS_URL: z.string().optional(),

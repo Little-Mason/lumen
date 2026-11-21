@@ -43,7 +43,7 @@
 
 - 每次调用落 `AiJob`：`promptTokens / completionTokens / costCents / latencyMs / status / error`。
 - `estimateCostCents` 仅做估算口径，界面标注「非账单」；生产可接供应商账单对账。
-- 每分钟每用户 `AI_RATE_LIMIT_PER_MIN`（Redis INCR + EXPIRE）；月度 `AI_MONTHLY_BUDGET_CENTS` 超限后降级到便宜模型或返回 429。
+- 每分钟每用户 `AI_RATE_LIMIT_PER_MIN`：配置 `REDIS_URL` 时走 Redis `INCR + EXPIRE`（多实例共享），未配置或连接失败自动降级到进程内固定窗口；月度 `AI_MONTHLY_BUDGET_CENTS` 按当月 `AiJob.costCents` 汇总，超限返回 `429 BUDGET_EXCEEDED`，工作台仍可手动写作。
 - 相同 `contentId + 正文 hash + kind` 的非流式结果缓存 24h，重复点「生成摘要」不重复花钱。
 - 模型超时 20s、最多 1 次重试；连续失败熔断，工作台显示「AI 暂不可用，可继续手动写作」。
 
@@ -58,3 +58,25 @@
 | 失败调用可追溯 | 100% 落 AiJob |
 
 CI 中 AI 相关 E2E 用 mock provider，**不消耗真实 token**。
+
+## 7. W3 落地情况（2026-11-21）
+
+| 设计项           | 实现位置                                                                 | 状态 |
+| ---------------- | ------------------------------------------------------------------------ | ---- |
+| 六种 kind        | `src/lib/ai/prompts.ts` + `src/lib/ai/mock.ts`                             | ✅   |
+| Provider 可插拔  | `src/lib/ai/provider.ts`（`AI_PROVIDER=mock \| openai-compatible`）         | ✅   |
+| SSE 流式         | `src/lib/sse.ts`（同构编解码）+ `streamAiJob()`，事件 `meta→delta*→done`    | ✅   |
+| 入参校验         | `src/lib/ai/validation.ts`（Zod），错误走 `aiFailure()`                     | ✅   |
+| 限流 / 预算      | `src/lib/ai/quota.ts` + `rate-limit.ts`                                    | ✅   |
+| 切片             | `src/lib/ai/chunk.ts`，标题/段落优先，超长段落退化窗口，带 overlap          | ✅   |
+| 写库 / 检索      | `src/server/services/rag.service.ts`，`$executeRaw` 写 vector、HNSW 余弦检索 | ✅   |
+| 发布即索引       | `src/server/services/index-sync.ts`，失败只告警不阻断发布，可 `/reindex` 补偿 | ✅   |
+| AiJob 记账       | `src/server/services/ai.service.ts`，成功/失败/重试/缓存全留痕              | ✅   |
+| 前端             | `/dashboard/ai` 工作台 + 写作台内嵌 `AiAssistBar`                          | ✅   |
+| E2E（mock）      | `tests/e2e/ai.spec.ts`，CI 设 `AI_PROVIDER=mock`                           | ✅   |
+
+**协议细节**：`POST /api/ai/run` 的 `stream` 默认 `false`；`POST /api/ai/ask` 默认 `true`。流式错误不发 HTTP 错误码（响应头已发出），而是发 `event: error` 并把 Job 记为 `FAILED`。RAG 检索片段由服务端组装，客户端无法伪造引用。
+
+**维度约束**：`ContentChunk.embedding` 是 `vector(1536)`；`EMBEDDING_DIM` 不等于 1536 时 `embedTexts()` 会主动抛 `DIM_MISMATCH`，提示同步改 schema、`001_pgvector.sql` 并重建切片表，避免写入时才发现维度不匹配。
+
+**已知取舍**：结果缓存是进程内 24h Map，多实例不共享（可接受，命中只是省钱）；mock embedding 是哈希词袋，只保证「含相同词的文本更相近」，用于可复现的检索演示，真实语义检索必须切真 embedding 模型。用量看板（按天聚合、P95）留在 W4。

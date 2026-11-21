@@ -4,21 +4,22 @@
 
 > 一处写作，三处生长：技术博客、小说连载、学习笔记进同一个系统，前台做自媒体，后台做 AI 写作台，底层把全部内容变成可提问的个人知识库。
 
-**仓库**：[github.com/Little-Mason/lumen](https://github.com/Little-Mason/lumen) · 分支 `main` · 当前为 v0.2（W1 地基 + W2 内容闭环已实现）
+**仓库**：[github.com/Little-Mason/lumen](https://github.com/Little-Mason/lumen) · 分支 `main` · 当前为 v0.3（W1 地基 + W2 内容闭环 + W3 AI/RAG 已实现）
 
 Lumen（`光栈`）是一个 AI 原生的个人内容工作台。它同时服务两个目的：**真实可用的自媒体发布站**，以及**能讲清楚全栈 + AI + CI/CD 的面试作品**。内容来源不是造的假数据——技术文章来自项目本身，小说章节来自每日连载，笔记来自备考与复盘，天然有真实流量和真实数据。
 
 ## 能做什么
 
-| 模块         | 内容                                                                 | 阶段    |
-| ------------ | -------------------------------------------------------------------- | ------- |
-| 统一内容模型 | `ARTICLE / CHAPTER / NOTE` 三类共用一张表，草稿 → 审阅 → 发布 → 归档 | W1      |
-| 前台公开站   | 列表、详情、标签、Markdown 渲染、SEO/OG、sitemap、RSS                | W2      |
-| 后台写作台   | 登录、Markdown 编辑、自动 slug、字数与阅读时长、发布日历             | W2      |
-| AI 辅助      | 大纲 / 标题 / 标签 / 摘要 / 润色，流式输出，prompt 防注入            | W3      |
-| 知识库问答   | 内容切片 → embedding → pgvector 检索 → 带引用回答（RAG）             | W3      |
-| 用量看板     | 每次 AI 调用的 token、成本、延迟、失败率、预算告警                   | W4      |
-| 工程基线     | CI 门禁、E2E、多阶段 Docker 镜像、自动迁移、健康检查、回滚           | W1 → W4 |
+| 模块         | 内容                                                                 | 状态       |
+| ------------ | -------------------------------------------------------------------- | ---------- |
+| 统一内容模型 | `ARTICLE / CHAPTER / NOTE` 三类共用一张表，草稿 → 审阅 → 发布 → 归档 | ✅ W1      |
+| 前台公开站   | 列表、详情、标签、Markdown 渲染、SEO/OG、sitemap、RSS                | ✅ W2      |
+| 后台写作台   | 登录、Markdown 编辑、自动 slug、字数与阅读时长                       | ✅ W2      |
+| AI 辅助      | 大纲 / 标题 / 标签 / 摘要 / 润色，SSE 流式输出，prompt 防注入        | ✅ W3      |
+| 知识库问答   | 内容切片 → embedding → HNSW 检索 → 带引用回答（RAG）                 | ✅ W3      |
+| 调用记账     | 每次 AI 调用的 token、成本、延迟、失败原因与月度预算熔断             | ✅ W3      |
+| 用量看板     | 按天聚合的调用量、成本、失败率、P95 延迟、发布日历                   | ⏳ W4      |
+| 工程基线     | CI 门禁、E2E、多阶段 Docker 镜像、自动迁移、健康检查、回滚           | W1 → W4    |
 
 ## 技术栈
 
@@ -47,7 +48,8 @@ lumen/
 │   ├── app/               页面与 Route Handlers（含 /api/health）
 │   ├── components/        UI 组件
 │   ├── lib/               env / db / logger / auth / ai / utils（无业务耦合）
-│   ├── server/services/   content.service / ai.service（业务编排）
+│   │   └── ai/            provider / prompts / mock / chunk / cache / quota / rate-limit / sse-client
+│   ├── server/services/   content / ai / rag / index-sync（业务编排）
 │   └── types/             共享 DTO 契约
 ├── tests/                 unit / e2e
 ├── docs/                  ROADMAP / API / AI-DESIGN / CI-CD / DEPLOYMENT / INTERVIEW / ADR
@@ -64,7 +66,7 @@ docker compose up -d
 
 # 2. 装依赖与环境变量
 npm install
-cp .env.example .env        # 填入 AUTH_SECRET、AI_API_KEY、EMBEDDING_API_KEY
+cp .env.example .env        # 只需填 AUTH_SECRET；AI 默认走 mock provider，密钥可选
 
 # 3. 扩展 → 迁移 → 向量索引 → 种子数据（顺序不能反）
 npx prisma db execute --file prisma/sql/000_extensions.sql --schema prisma/schema.prisma
@@ -78,11 +80,11 @@ npm run dev                 # http://localhost:3000 ，/api/health 返回 200 �
 
 > **本机 Docker 起不来时**：可以完全绕开 Docker，用 Windows 原生 PostgreSQL 16 + pgvector 预编译包，同样满足 `DATABASE_URL`。这是当前开发机的实际配置（`D:\appRun\PostgreSQL\16`，服务 `postgresql-x64-16`），步骤与验收结果见 `docs/DASHBOARD-PLAN.md` 的「门禁 A · A4」。`docker-compose.yml` 仍保留给 CI/CD 与容器化部署使用，两条路径的数据库凭据一致。
 >
-> 2026-11-20 20:45 补充：Docker 引擎已通过 `docker-vmm` 模式修复并正常运行（不依赖 WSL2），但本机到 Docker Hub 的网络不通，拉不到镜像，所以本地 `docker compose up -d` 仍不可用；继续用上面的原生 PostgreSQL。详见 `docs/DASHBOARD-PLAN.md`。
+> 2026-11-21 补充：Docker 引擎已通过 `docker-vmm` 模式修复（不依赖 WSL2），Docker Hub 直连超时已用 `registry-mirrors`（`docker.m.daocloud.io`）解决，容器创建/启动/`exec` 均验证通过。本机 5432 仍被原生 PostgreSQL 占用，因此不要直接 `docker compose up -d`；只起 Redis 可用 `docker compose up -d redis`。详见 `docs/DASHBOARD-PLAN.md`。
 
 > 2026-11-21 补充：`CREATE EXTENSION vector` 需要管理员权限，托管 Postgres 请先在平台 SQL 编辑器执行一次；扩展已存在时 `000_extensions.sql` 只是安全的 no-op。CI 的 `pgvector/pgvector:pg16` 里 `POSTGRES_USER=lumen` 本身就是超级用户，可以直接执行。
 
-> **当前状态**：依赖已锁定（`package-lock.json` + CI 用 `npm ci`）。W1 地基、门禁 B 认证闭环、W2 内容闭环均已落地；本地 `lint`、`typecheck`、单元测试（38/38）全绿，生产构建与 E2E 以 GitHub Actions（`ubuntu-latest`）结果为准——本机 Windows 环境写 `.next/trace` 会报 `EPERM`，不影响 CI。W3 的 AI/RAG 仍是契约先行。
+> **当前状态**：依赖已锁定（`package-lock.json` + CI 用 `npm ci`）。W1 地基、门禁 B 认证闭环、W2 内容闭环、W3 AI/RAG 均已落地；本地 `lint`、`typecheck`、`db:validate`、单元测试（82/82）全绿，生产构建与 E2E 以 GitHub Actions（`ubuntu-latest`）结果为准——本机 Windows 环境写 `.next/trace` 会报 `EPERM`，不影响 CI。W4 用量看板与上线仍待做。
 
 ## 门禁 B · 认证闭环（已通过）
 
@@ -128,6 +130,38 @@ curl -s -b /tmp/lumen.cookies -c /tmp/lumen.cookies -X POST http://localhost:300
 
 中文标题会生成含中文的 slug，动态路由参数用 `normalizeSlugParam()` 解码后再查库。状态流转走 `canTransition()` 白名单，归档内容必须先回到草稿。首份迁移在 `prisma/migrations/20261121000000_init`，CI/CD 已从 `db push` 切到 `migrate deploy`。
 
+## W3 · AI 与 RAG（已通过）
+
+`/dashboard/ai` 是三个页签：**写作助手**（五种能力、流式/非流式切换、载入已有正文）、**知识库问答**（流式回答 + 可点击引用）、**调用记录**（token、成本、延迟、状态）。写作台的编辑器里也内嵌了 AI 工具条，生成结果确认后可一键回填标题、标签、摘要或正文。
+
+```bash
+# 非流式生成摘要
+curl -s -b /tmp/lumen.cookies -X POST http://localhost:3000/api/ai/run \
+  -H 'Content-Type: application/json' \
+  -d '{"kind":"SUMMARIZE","body":"# 标题\n\n正文内容","stream":false}'
+
+# 流式润色（SSE）
+curl -N -b /tmp/lumen.cookies -X POST http://localhost:3000/api/ai/run \
+  -H 'Content-Type: application/json' \
+  -d '{"kind":"POLISH","body":"待润色正文","stream":true}'
+
+# 知识库问答
+curl -s -b /tmp/lumen.cookies -X POST http://localhost:3000/api/ai/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"pgvector 的 HNSW 索引怎么用？","stream":false}'
+
+# 手动重建某篇内容的切片
+curl -s -b /tmp/lumen.cookies -X POST http://localhost:3000/api/contents/<id>/reindex
+```
+
+实现要点：
+
+- **Provider 可插拔**：`AI_PROVIDER=mock`（默认）用确定性哈希词袋 embedding 与模板化输出，无密钥、零 token、CI 可稳定断言；改成 `openai-compatible` 并填好两组密钥即接 DeepSeek / OpenAI / 硅基流动，业务代码不动。
+- **发布即索引**：publish / 已发布内容的正文更新自动重建切片，unpublish / archive 删除切片；索引失败只记日志，绝不阻断发布，可调用 `/reindex` 补偿。
+- **检索**：按 Markdown 标题与段落边界切 500–800 字（重叠 80 字），`embedding <=> $1::vector` 走 HNSW 余弦检索，只返回已发布内容；片段不足时明确回答「内容库中没有相关记录」。
+- **防注入**：统一的 `SYSTEM_PROMPT` 声明正文与检索片段里的指令一律当数据；任务指令放在输入之后；单测覆盖夹带指令的正文，断言注入词不进入输出。
+- **可运维**：每次调用（含失败）都落 `AiJob`；每分钟限流支持 Redis `INCR+EXPIRE` 与进程内降级；月度预算按 `costCents` 汇总熔断；非流式结果按 `kind + contentId + 正文 hash` 缓存 24h。详见 `docs/AI-DESIGN.md`。
+
 ## 常用脚本
 
 | 命令                                                             | 作用                                |
@@ -140,7 +174,7 @@ curl -s -b /tmp/lumen.cookies -c /tmp/lumen.cookies -X POST http://localhost:300
 
 ## 环境变量
 
-完整清单见 `.env.example`。最小必需：`DATABASE_URL`、`AUTH_SECRET`；启用 AI 再补 `AI_API_KEY`，启用 RAG 再补 `EMBEDDING_API_KEY`。**服务端变量一律不进 `NEXT_PUBLIC_*`**。
+完整清单见 `.env.example`。最小必需只有 `DATABASE_URL`、`AUTH_SECRET`——AI 默认 `AI_PROVIDER=mock`，不填密钥也能跑完整闭环。要接真实模型再补 `AI_API_KEY` / `EMBEDDING_API_KEY` 并切换 `AI_PROVIDER`；`REDIS_URL` 只在多实例部署时需要。**服务端变量一律不进 `NEXT_PUBLIC_*`**。
 
 ## 四周路线与验收
 

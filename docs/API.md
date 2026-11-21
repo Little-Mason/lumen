@@ -42,31 +42,42 @@
 写接口统一经 `requireUser()`：校验 JWT 且确认账号仍在库中，删号后旧 Cookie 立即失效。
 状态流转由 `canTransition()` 约束；非法流转返回 `409 INVALID_TRANSITION`，越权返回 `403 FORBIDDEN`。
 
-## AI
+## AI（W3 已实现）
 
-| 方法 | 路径                        | 说明                                                                    |
-| ---- | --------------------------- | ----------------------------------------------------------------------- |
-| POST | `/api/ai/jobs`              | body: `AiJobRequest { kind, contentId?, body, extra? }` → `AiJobResult` |
-| GET  | `/api/ai/jobs/:id/stream`   | SSE 流式输出（长文本润色 / RAG 问答）                                   |
-| POST | `/api/ai/ask`               | RAG 问答，返回答案 + 引用片段 `contentId/chunkIndex`                    |
-| GET  | `/api/ai/usage`             | 当前用户按天聚合的调用量、成本、失败率                                  |
-| POST | `/api/contents/:id/reindex` | 手动重建该内容的向量切片                                                |
+| 方法 | 路径                        | 权限 | 说明                                                                                       |
+| ---- | --------------------------- | ---- | ------------------------------------------------------------------------------------------ |
+| POST | `/api/ai/run`               | 登录 | 五种写作能力 `OUTLINE/TITLE/TAGS/SUMMARIZE/POLISH`；`stream:false` 返回 JSON，`true` 返回 SSE |
+| POST | `/api/ai/ask`               | 登录 | RAG 问答：`{ question, contentId?, stream? }`，先 HNSW 检索再流式回答，附引用列表          |
+| GET  | `/api/ai/jobs`              | 登录 | 当前用户调用流水 `?page=1&pageSize=20&kind=&status=` → `Paginated<AiJobDTO>`             |
+| POST | `/api/contents/:id/reindex` | 作者 | 手动重建切片，返回 `{ contentId, chunks }`；索引失败不阻断发布                            |
 
-`AiJobResult` 示例：
+`POST /api/ai/run` body：`{ kind, body, contentId?, extra?, stream? }`。`contentId` 必须是本人内容，否则 404。
+`POST /api/ai/ask` 默认 `stream:true`；`contentId` 只用于把检索限定到某篇内容。
+
+非流式响应：
 
 ```json
 {
-  "jobId": "clx...",
-  "kind": "OUTLINE",
-  "text": "1. 开头：……",
-  "promptTokens": 512,
-  "completionTokens": 220,
-  "costCents": 1,
-  "latencyMs": 1840
+  "result": {
+    "jobId": "clx...",
+    "kind": "OUTLINE",
+    "text": "1. 引言：……",
+    "promptTokens": 512,
+    "completionTokens": 220,
+    "costCents": 1,
+    "latencyMs": 1840,
+    "cached": false
+  }
 }
 ```
 
-**限流**：每用户 `AI_RATE_LIMIT_PER_MIN`（默认 20）次/分钟，Redis 计数；超预算返回 429 并在响应头给 `X-Budget-Reset`。
+流式响应 `Content-Type: text/event-stream`，事件顺序固定为
+`meta`（jobId / kind / model / sources）→ 若干 `delta`（`{ "text": "..." }`）→ `done`（完整 `AiJobResult` + sources）；
+模型失败则发 `error`（`{ code, message }`）并收尾，同时把该 Job 记为 `FAILED`。
+
+**限流与降级**：每用户 `AI_RATE_LIMIT_PER_MIN`（默认 20）次/分钟；配置 `REDIS_URL` 时走 Redis `INCR + EXPIRE`，否则降级到进程内计数器。月度预算按当月 `AiJob.costCents` 汇总，超限返回 `429 BUDGET_EXCEEDED`；限流返回 `429 RATE_LIMITED` 并带 `Retry-After`。模型失败返回 `502 PROVIDER_ERROR`。成本为估算口径（非账单）。
+
+**未实现的契约**：`/api/ai/usage` 与 `/api/analytics/overview` 属于 W4 用量看板，暂未开放。
 
 ## 运维
 
@@ -77,9 +88,9 @@
 
 ## 前端页面
 
-`/`（首页）、`/posts/[slug]`（详情）、`/tags/[slug]`、`/dashboard`（工作台）、`/login`。
-`sitemap.xml`、`robots.txt`、`rss.xml` 由 Route Handler 生成（W2）。
+`/`（首页）、`/posts/[slug]`（详情）、`/tags/[slug]`、`/dashboard`（工作台）、`/dashboard/content`、`/dashboard/ai`、`/login`。
+`sitemap.xml`、`rss.xml` 由 Route Handler 生成，`robots.txt` 为静态文件。
 
-> v0.2 已实现 `/api/health`、`/api/auth/*` 与全部 `/api/contents/*`、`/api/tags`（W2 内容闭环）。`/sitemap.xml`、`/rss.xml` 由 Route Handler 输出，`/robots.txt` 为静态文件。AI 相关接口仍是**契约先行**：service 层与类型已定义，W3 按本表实现，避免边写边改接口。
+> v0.3 已实现 `/api/health`、`/api/auth/*`、全部 `/api/contents/*`、`/api/tags` 与 AI 三件套（`/api/ai/run`、`/api/ai/ask`、`/api/ai/jobs`）。AI 默认走确定性 mock provider，填入密钥并把 `AI_PROVIDER` 改为 `openai-compatible` 即可切真模型，业务代码不变。
 >
 > 认证细节：`AUTH_SECRET` 签 HS256 JWT，7 天有效；Cookie 为 `httpOnly + sameSite=lax`，生产环境加 `secure`。`src/middleware.ts` 只用 jose 校验签名（Edge 安全，不查库、不引 bcrypt），未登录访问 `/dashboard*` 跳转 `/login?next=...`；业务权限仍由 service 层判定。注册首个账号后默认关闭，需配置 `AUTH_INVITE_CODE`。登录失败会做一次固定 bcrypt 比较，避免用响应时间枚举邮箱。

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth/require-user';
 import { apiError, contentFailure, readJson } from '@/lib/http';
 import { archiveContent, getOwnedById, updateContent } from '@/server/services/content.service';
+import { safeReindex, safeRemoveIndex } from '@/server/services/index-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,13 @@ export async function PATCH(request: Request, { params }: Context) {
     if (body === null) return apiError(400, 'INVALID_INPUT', '请求体必须是合法 JSON');
 
     const content = await updateContent(id, body, user.sub);
+    const touchesBody =
+      typeof body === 'object' &&
+      body !== null &&
+      Object.prototype.hasOwnProperty.call(body, 'contentMd');
+    if (content.status === 'PUBLISHED' && touchesBody) {
+      await safeReindex(content.id);
+    }
     return NextResponse.json({ content });
   } catch (error) {
     return contentFailure(error);
@@ -40,6 +48,7 @@ export async function DELETE(_request: Request, { params }: Context) {
     const user = await requireUser();
     const { id } = await params;
     const content = await archiveContent(id, user.sub);
+    await safeRemoveIndex(content.id);
     return NextResponse.json({ content });
   } catch (error) {
     return contentFailure(error);

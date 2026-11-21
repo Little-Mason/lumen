@@ -15,6 +15,8 @@
 
 设计要点：构建期只用占位 env，真实密钥只在运行时注入，避免密钥进入镜像层；`concurrency` 取消同一分支的旧任务，省 CI 时间。
 
+**AI 相关门禁**：workflow 全局设 `AI_PROVIDER=mock`、`AI_MOCK_LATENCY_MS=0`，E2E 的 AI 生成与 RAG 问答走确定性 mock provider，不申请任何密钥、不消耗真实 token，断言可复现。`e2e` job 里 `001_pgvector.sql` 建的 HNSW 索引会被「发布 → 自动切片 → 检索」用例真实走到，因此扩展与索引 SQL 的顺序不能调整。
+
 ## 3. CD（`.github/workflows/deploy.yml`）
 
 由 `workflow_run` 在 **main 的 CI 成功** 后触发，或手动 `workflow_dispatch`：

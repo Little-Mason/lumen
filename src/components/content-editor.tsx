@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { AiAssistBar, type AssistKind } from '@/components/ai-assist';
 import { StatusBadge } from '@/components/status-badge';
 import { countWords } from '@/lib/utils/slug';
 import type { ContentDetailDTO, ContentStatus, ContentType } from '@/types';
@@ -112,6 +113,30 @@ export function ContentEditor({
     }
   }
 
+  function applyAi(kind: AssistKind, text: string) {
+    switch (kind) {
+      case 'POLISH':
+        setContentMd(text);
+        break;
+      case 'SUMMARIZE':
+        setExcerpt(text);
+        break;
+      case 'TAGS':
+        setTags(text);
+        break;
+      case 'OUTLINE':
+        setContentMd((previous) => `${previous.trim()}\n\n${text}`.trim());
+        break;
+      case 'TITLE': {
+        const first = text.split('\n')[0]?.replace(/^\s*\d+[.、]\s*/, '') ?? text;
+        setTitle(first);
+        break;
+      }
+    }
+    setError(null);
+    setNotice('AI 结果已应用到编辑器，记得保存。');
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -209,6 +234,8 @@ export function ContentEditor({
           </div>
         </div>
       </div>
+
+      <AiAssistBar body={contentMd} contentId={id || undefined} onApply={applyAi} />
 
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">

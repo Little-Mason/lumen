@@ -29,11 +29,13 @@
 
 ## W3 · 12/03–12/09　AI 与 RAG
 
-- [ ] 五种能力：OUTLINE / TITLE / TAGS / SUMMARIZE / POLISH，接 `ai.service` 契约
-- [ ] SSE 流式输出、Zod 入参校验、Redis 限流、预算熔断
-- [ ] 切片 → embedding → `ContentChunk` 写入 → HNSW 检索 → 带出处回答
-- [ ] prompt 防注入用例测试；失败重试与 AiJob 记账完整
-- [ ] E2E 覆盖 AI 调用（用 mock provider，避免 CI 消耗真实 token）
+- [x] 五种能力：OUTLINE / TITLE / TAGS / SUMMARIZE / POLISH，接 `ai.service` 契约
+- [x] SSE 流式输出、Zod 入参校验、Redis 限流（未配置时进程内降级）、预算熔断
+- [x] 切片 → embedding → `ContentChunk` 写入 → HNSW 检索 → 带出处回答
+- [x] prompt 防注入用例测试；失败重试与 AiJob 记账完整
+- [x] E2E 覆盖 AI 调用（用 mock provider，避免 CI 消耗真实 token）
+
+**W3 完成说明**：默认 `AI_PROVIDER=mock`（确定性假模型 + 哈希词袋 embedding），零密钥零 token 即可跑完整闭环；填密钥切 `openai-compatible` 即接真模型。发布自动重建切片、下线/归档自动删除，索引失败不阻断发布。单测 82/82，详见 `docs/AI-DESIGN.md` 第 7 节。W1 的 `/api/health` 容器健康检查项仍未实测，随 W4 上线一起收尾。
 
 **验收**：对已发布内容提问，回答只引用库内片段；`AiJob` 表能看到 token、成本、延迟。
 

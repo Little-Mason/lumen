@@ -350,10 +350,18 @@ export async function listPublishedSummaries(limit = 500): Promise<PublishedSumm
   });
 }
 
-/**
- * W3 占位：发布/编辑后重新切片并写入 ContentChunk。
- * 现在刻意做成无副作用的 no-op，避免 W2 的发布流程被未实现的 RAG 阻断。
- */
-export async function reindexContent(_contentId: string): Promise<void> {
-  return;
+// 切片与向量索引的维护在 rag.service.ts / index-sync.ts，
+// 由 publish / unpublish / PATCH / archive 的 Route Handler 显式调用，
+// 内容服务本身只负责内容模型，避免发布流程被 embedding 失败阻断。
+
+export type WritableContent = { id: string; title: string; contentMd: string };
+
+/** AI 工作台「从已有内容载入」下拉框，只取当前用户未归档内容的正文。 */
+export async function listWritableContents(userId: string, limit = 20): Promise<WritableContent[]> {
+  return db.content.findMany({
+    where: { authorId: userId, status: { not: 'ARCHIVED' } },
+    orderBy: { updatedAt: 'desc' },
+    take: limit,
+    select: { id: true, title: true, contentMd: true },
+  });
 }
